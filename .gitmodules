@@ -1,0 +1,6 @@
+[submodule "Thirdparty/KITTI_tools/kitti_raw_devkit/kitti-pcl"]
+	path = Thirdparty/KITTI_tools/kitti_raw_devkit/kitti-pcl
+	url = https://github.com/yanii/kitti-pcl.git
+[submodule "Thirdparty/KITTI_tools/kitti_raw_devkit/QtKittiVisualizer"]
+	path = Thirdparty/KITTI_tools/kitti_raw_devkit/QtKittiVisualizer
+	url = https://github.com/MarkMuth/QtKittiVisualizer.git
