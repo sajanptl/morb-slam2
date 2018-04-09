@@ -405,11 +405,12 @@ void saveStats (vector<errors> err,string dir) {
   fclose(fp);
 }
 
-bool eval (string result_sha,Mail* mail) {
+bool eval (string gt_dir, string result_dir, string result_sha,Mail* mail) {
 
   // ground truth and result directories
-  string gt_dir         = "data/odometry/poses";
-  string result_dir     = "results/" + result_sha;
+//  string gt_dir         = "data/odometry/poses";
+//  string result_dir     = "results/" + result_sha;
+  result_dir += "/" + result_sha;
   string error_dir      = result_dir + "/errors";
   string plot_path_dir  = result_dir + "/plot_path";
   string plot_error_dir = result_dir + "/plot_error";
@@ -482,6 +483,7 @@ int32_t main (int32_t argc,char *argv[]) {
 
   // we need 2 or 4 arguments!
   if (argc!=2 && argc!=4) {
+    cout << argc << "\n";
     cout << "Usage: ./eval_odometry result_sha [user_sha email]" << endl;
     return 1;
   }
@@ -496,7 +498,13 @@ int32_t main (int32_t argc,char *argv[]) {
   mail->msg("Thank you for participating in our evaluation!");
 
   // run evaluation
-  bool success = eval(result_sha,mail);
+  string gt_dir;
+  string res_dir;
+  std::cout << "Enter gt pose dir\n";
+  std::cin >> gt_dir;
+  std::cout << "Enter result dir\n";
+  std::cin >> res_dir;
+  bool success = eval(gt_dir, res_dir, result_sha,mail);
   if (argc==4) mail->finalize(success,"odometry",result_sha,argv[2]);
   else         mail->finalize(success,"odometry",result_sha);
 
