@@ -26,17 +26,17 @@ int main()
 	imuSeq.add(u3, t3);
 
 	cout << "get 0-3" << endl;
-	auto res = imuSeq(0, 3);
+	auto res = imuSeq.get(0, 3);
 	for (const auto& r : res)
 		cout << r.first << " " << r.second.transpose() << endl;
 	
 	cout << "get 0.5-2.5" << endl;
-	res = imuSeq(0.5, 2.5);
+	res = imuSeq.get(0.5, 2.5);
 	for (const auto& r : res)
 		cout << r.first << " " << r.second.transpose() << endl;
 	
 	cout << "get -0.5-3.5" << endl;
-	res = imuSeq(-0.5, 3.5);
+	res = imuSeq.get(-0.5, 3.5);
 	for (const auto& r : res)
 		cout << r.first << " " << r.second.transpose() << endl;
 	

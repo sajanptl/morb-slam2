@@ -26,7 +26,7 @@ void IMUSequence::add(const VectorXd& u, double t)
 		imuSeq.pop_front();
 }
 
-deque<pair<double, VectorXd>> IMUSequence::operator()(double tmin, double tmax)
+deque<pair<double, VectorXd>> IMUSequence::get(double tmin, double tmax)
 {
 	lock_guard<mutex> lck(mtx); // lock, will release mtx when going out of scope
 	

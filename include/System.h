@@ -22,9 +22,11 @@
 #ifndef SYSTEM_H
 #define SYSTEM_H
 
-#include<string>
-#include<thread>
-#include<opencv2/core/core.hpp>
+#include <string>
+#include <thread>
+#include <opencv2/core/core.hpp>
+
+#include <Eigen/Core>
 
 #include "Tracking.h"
 #include "FrameDrawer.h"
@@ -36,6 +38,8 @@
 #include "ORBVocabulary.h"
 #include "Viewer.h"
 
+#include "IMUSequence.h"
+
 namespace ORB_SLAM2
 {
 
@@ -45,6 +49,7 @@ class Map;
 class Tracking;
 class LocalMapping;
 class LoopClosing;
+class IMUSequence;
 
 class System
 {
@@ -121,6 +126,9 @@ public:
     int GetTrackingState();
     std::vector<MapPoint*> GetTrackedMapPoints();
     std::vector<cv::KeyPoint> GetTrackedKeyPointsUn();
+	
+	// IMU Handling
+	void AddIMUMeasurement(const Eigen::VectorXd& imu, const double& timestamp);
 
 private:
 
@@ -174,6 +182,9 @@ private:
     std::vector<MapPoint*> mTrackedMapPoints;
     std::vector<cv::KeyPoint> mTrackedKeyPointsUn;
     std::mutex mMutexState;
+
+	// IMU Sequence
+	IMUSequence* mImuSeq;
 };
 
 }// namespace ORB_SLAM

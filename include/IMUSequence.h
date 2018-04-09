@@ -21,7 +21,7 @@ public:
 
 	void reset() { std::lock_guard<std::mutex> lck(mtx); imuSeq.clear(); }
 	
-	std::deque<std::pair<double, Eigen::VectorXd>> operator()(double tmin, double tmax);
+	std::deque<std::pair<double, Eigen::VectorXd>> get(double tmin, double tmax);
 
 private:
 	int maxSeqLen;
