@@ -39,6 +39,11 @@
 #include <utility>
 #include <mutex>
 
+#include "Thirdparty/g2o/g2o/types/se3quat.h" 
+#include <Eigen/Dense>
+
+using namespace Eigen;
+using namespace g2o;
 using namespace std;
 
 namespace ORB_SLAM2
