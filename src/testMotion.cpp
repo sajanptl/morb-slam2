@@ -7,20 +7,23 @@
 #include "Thirdparty/g2o/g2o/core/robust_kernel_impl.h"
 #include "Thirdparty/g2o/g2o/solvers/linear_solver_dense.h"
 #include "Thirdparty/g2o/g2o/types/types_seven_dof_expmap.h"
+#include "Thirdparty/g2o/g2o/types/se3_ops.h"
 #include <iostream>
+#include <deque>
+#include <math.h>
 
-#include<Eigen/StdVector>
+// #include<Eigen/StdVector>
 // May need to include unsupported for exp or else we can do it element by element
-#include<unsupported/Eigen/MatrixFunctions>
+// #include<eigen3/unsupported/Eigen/MatrixFunctions>
 
 #include "Converter.h"
-
+#define PI 3.1415926536
 #include<mutex>
 
-using namespace Eigen;
-
-typedef Matrix<double, 6, 1> Vector6d;
-typedef Matrix<double, 3, 1> Vector3d;
+// namespace ORB_SLAM2
+// {
+typedef Eigen::Matrix<double, 6, 1> Vector6d;
+// typedef Matrix<double, 3, 1> Vector3d;
 
 // Pose is the return type of the motion model
 class MotionBase
@@ -28,8 +31,8 @@ class MotionBase
 public:
 	MotionBase() {}
 	~MotionBase() {}
-	virtual Vector3d calc() = 0;
-	Vector3d calc();
+	// virtual Eigen::Vector3d calc() = 0;
+	// Eigen::Vector3d calc();
 };
 
 /* Result:
@@ -50,10 +53,43 @@ class KittiMotion : public MotionBase
 public:
 	KittiMotion()
 	{
-		p << 0, 0, 0;
+		p << 0,
+			 0,
+			 0;
+		R << 1, 0, 0,
+			 0, 1, 0,
+			 0, 0, 1;
+		v << 0,
+			 0,
+			 0;
+		omega << 0,
+				 0,
+				 0;
+		a << 0,
+			 0,
+			 0;
+		ba << 0,
+			  0,
+			  0;
+		bg << 0,
+			  0,
+			  0;
 	}
-	~KittiMotion();
-	Vector3d calc(const Vector3d &p0, const Eigen::Matrix3d &R0, const Vector3d &v0, const Vector6d &imu, const double &dt) {
+	~KittiMotion() {}
+	Eigen::Matrix3d exp(const Eigen::Vector3d &omega) {
+		double theta = omega.norm();
+		Eigen::Matrix3d Omega = g2o::skew(omega);
+		Eigen::Matrix3d Omega2 = Omega * Omega;
+		Eigen::Matrix3d R;
+		if (theta < 0.00001) {
+			R = (Eigen::Matrix3d::Identity() + Omega + Omega*Omega);
+			return R;
+		}
+		R = (Eigen::Matrix3d::Identity()
+			 + sin(theta) / theta * Omega + (1 - cos(theta)) / (theta * theta) * Omega2);
+		return R;
+	}
+	g2o::SE3Quat calc(const Eigen::Vector3d &p0, const Eigen::Matrix3d &R0, const Eigen::Vector3d &v0, const Vector6d &imu, const double &dt) {
 		omega[0] = imu[3];
 		omega[1] = imu[4];
 		omega[2] = imu[5];
@@ -61,32 +97,71 @@ public:
 		a[1] = imu[1];
 		a[2] = imu[2];
 		// Update equations
-		Vector3d exp_term = omega * dt;
-		R = R0 * exp_term.exp();
-		v = v0 + (a * dt);
-		p = p0 + (v0 * dt) + (0.5 * a * pow(dt,2));
-		return p;
+		cout << "R before:\n" << R << "\n";
+		R = R0 * exp((omega - bg) * dt);
+		cout << "R after:\n" << R << "\n";
+		v = v0 + ((a - ba) * dt);
+		p = p0 + (v0 * dt) + (0.5 * (a - ba) * pow(dt,2));
+		g2o::SE3Quat result(R,p);
+		return result;
+	}
+	g2o::SE3Quat calc(const Eigen::Vector3d &p0, const Eigen::Matrix3d &R0, const Eigen::Vector3d &v0, deque<Vector6d> &imus, const double &dt)
+	{
+		g2o::SE3Quat result;
+		for (int i = 0; i < int(imus.size() - 1); ++i)
+		{
+			result = calc(p0, R0, v0, imus[i], dt);
+			
+		}
+		return result;
+	}
+	void setLinearBias(Eigen::Vector3d ba_in) {
+		ba = ba_in;
+		return;
+	}
+	void setAngularBias(Eigen::Matrix3d bg_in) {
+		bg = bg_in;
+		return;
 	}
 private:
-	Vector3d p;
-	Vector3d R;
-	Vector3d v;
-	Vector3d omega;
-	Vector3d a;
+	Eigen::Vector3d p;
+	Eigen::Matrix3d R;
+	Eigen::Vector3d v;
+	Eigen::Vector3d omega;
+	Eigen::Vector3d a;
+	Eigen::Vector3d ba;
+	Eigen::Vector3d bg;
 };
 
-namespace ORB_SLAM2
+void stayTest()
 {
-void testDoNothing()
-{
+	KittiMotion testObject;
+	g2o::SE3Quat quat_result;
+	Eigen::Vector3d p;
+	Eigen::Vector3d p0;
+	Eigen::Matrix3d R0;
+	Eigen::Vector3d v0;
+	Vector6d imu;
+	p0 << 0,
+		  0,
+		  0;
+	R0 << cos(PI), 	-sin(PI), 	0,
+		  sin(PI),	cos(PI),	0,
+		  0, 		0, 			1;
+	v0 << 1,
+		  0,
+		  0;
+	imu << 0, 0, 0, 0, 0, 0;
+	double dt = 1;
+	quat_result = testObject.calc(p0, R0, v0, imu, dt);
+	cout << "Start:\n" << p0 << "\nEnd:\n" << quat_result.to_homogeneous_matrix() << "\n";
 	return;
 }
 
 int main(int argc, char const *argv[])
 {
-	KittiMotion testObject;
-	cout << "Hello, World!\n";
+	stayTest();
 	return 0;
 }
 
-}
+// }
