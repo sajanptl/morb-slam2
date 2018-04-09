@@ -108,10 +108,13 @@ public:
 	g2o::SE3Quat calc(const Eigen::Vector3d &p0, const Eigen::Matrix3d &R0, const Eigen::Vector3d &v0, deque<Vector6d> &imus, const double &dt)
 	{
 		g2o::SE3Quat result;
+		Eigen::Vector3d p_previous = p0;
+		Eigen::Matrix3d R_previous = R0;
 		for (int i = 0; i < int(imus.size() - 1); ++i)
 		{
-			result = calc(p0, R0, v0, imus[i], dt);
-			
+			result = calc(p_previous, R_previous, v0, imus[i], dt);
+			p_previous = result.translation();
+			R_previous = result.rotation().toRotationMatrix();
 		}
 		return result;
 	}
@@ -119,7 +122,7 @@ public:
 		ba = ba_in;
 		return;
 	}
-	void setAngularBias(Eigen::Matrix3d bg_in) {
+	void setAngularBias(Eigen::Vector3d bg_in) {
 		bg = bg_in;
 		return;
 	}
@@ -145,16 +148,16 @@ void stayTest()
 	p0 << 0,
 		  0,
 		  0;
-	R0 << cos(PI), 	-sin(PI), 	0,
-		  sin(PI),	cos(PI),	0,
-		  0, 		0, 			1;
+	R0 << 1, 0, 0,
+		  0, 1, 0,
+		  0, 0, 1;
 	v0 << 1,
 		  0,
 		  0;
 	imu << 0, 0, 0, 0, 0, 0;
 	double dt = 1;
 	quat_result = testObject.calc(p0, R0, v0, imu, dt);
-	cout << "Start:\n" << p0 << "\nEnd:\n" << quat_result.to_homogeneous_matrix() << "\n";
+	cout << "Start:\n" << p0 << "\nEnd:\n" << quat_result.rotation().toRotationMatrix() << "\n";
 	return;
 }
 
