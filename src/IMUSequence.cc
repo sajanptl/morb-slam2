@@ -8,22 +8,26 @@ using std::lower_bound;
 using std::upper_bound;
 using std::vector;
 using std::pair;
+using std::make_pair;
 using std::deque;
-using std::muxtex;
+using std::mutex;
 using std::lock_guard;
 using Eigen::VectorXd;
 
+namespace ORB_SLAM2
+{
+
 void IMUSequence::add(const VectorXd& u, double t)
 {
-	lock_guard<mutex> lck(mtx);
-	imuSeq.emplace_back({t, u});
+	lock_guard<mutex> lck(mtx); // lock, will release mtx when going out of scope
+	imuSeq.push_back(make_pair(t, u));
 	if ((maxSeqLen != -1) && (static_cast<int>(imuSeq.size()) > maxSeqLen)) 
 		imuSeq.pop_front();
 }
 
-deque<pair<double, VectorXd>> operator()(double tmin, tmax)
+deque<pair<double, VectorXd>> IMUSequence::operator()(double tmin, double tmax)
 {
-	lock_guard<mutex> lck(mtx);
+	lock_guard<mutex> lck(mtx); // lock, will release mtx when going out of scope
 	
 	// get bounds for tmin and tmax
 	auto low = lower_bound(imuSeq.begin(), imuSeq.end(), tmin,
@@ -36,42 +40,44 @@ deque<pair<double, VectorXd>> operator()(double tmin, tmax)
 	deque<pair<double, VectorXd>> useq(low, up); // initialize from iterators
 	
 	constexpr double eps = 1e-6; // tolerance for equality of doubles
-	auto interp = [](double t, double t0, double dt, double u0, double du, double eps)
+	auto interp = [](double t, double t0, double dt, const VectorXd& u0, const VectorXd& du, double eps)
 					{ return (dt > eps) ? ((t - t0) / dt * du) + u0 : u0; };
 
-	if (abs(low.first - tmin) > eps) // tmin does not match low.first
+	if (abs(low->first - tmin) > eps) // tmin does not match low.first
 	{
 		// adjust forward iterators to set up interpolation
 		auto lowPrev = low;
 		auto lowNext = low;
-		if (low.first < tmin) ++lowNext;
+		if (low->first < tmin) ++lowNext;
 		else if (low != imuSeq.begin()) lowPrev = imuSeq.begin() + (low - imuSeq.begin() - 1);
 		
 		// perform interpolation
-		auto ui = interp(tmin, lowPrev.first, lowNext.first - lowPrev.first,
-					     lowPrev.second, lowNext.second - lowPrev.second, eps);
+		auto ui = interp(tmin, lowPrev->first, lowNext->first - lowPrev->first,
+					     lowPrev->second, lowNext->second - lowPrev->second, eps);
 		
-		if (low.first < tmin) useq.front() = {tmin, ui}; // overwrite first pos with tmin to make it the lowest
-		else useq.emplace_front({tmin, ui}); // add to tmin to front to make it the lowest
+		if (low->first < tmin) useq.front() = make_pair(tmin, ui); // overwrite first pos with tmin to make it the lowest
+		else useq.push_front(make_pair(tmin, ui)); // add to tmin to front to make it the lowest
 	}
 	
 	// up is one past hi, so get pointer to hi (could be tmax or around tmax)
 	auto hi = imuSeq.begin() + (up - imuSeq.begin() - 1);
-	if (abs(hi.first - tmax) > eps) // tmax does not match hi.first
+	if (abs(hi->first - tmax) > eps) // tmax does not match hi.first
 	{
 		// adjust forward iterators to set up interpolation
 		auto hiPrev = hi;
 		auto hiNext = hi;
-		if (hi.first < tmax) ++hiNext;
+		if (hi->first < tmax) ++hiNext;
 		else if (up != imuSeq.end()) hiPrev = imuSeq.begin() + (hi - imuSeq.begin() - 1);
 
 		// preform interpolation
-		auto ui = interp(tmax, hiPrev.first, hiNext.first - hiPrev.first,
-						 hiPrev.second, hiNext.second - hiPrev.second, eps);
+		auto ui = interp(tmax, hiPrev->first, hiNext->first - hiPrev->first,
+						 hiPrev->second, hiNext->second - hiPrev->second, eps);
 
-		if (hi.first > tmax) useq.back() = {tmax, ui}; // overwrite last pos with tmax to make it the highest
-		else useq.emplace_back({tmax, ui}); // add tmax to back to make it the highest
+		if (hi->first > tmax) useq.back() = make_pair(tmax, ui); // overwrite last pos with tmax to make it the highest
+		else useq.push_back(make_pair(tmax, ui)); // add tmax to back to make it the highest
 	}
 	
 	return useq;
 }
+
+} // close ORB_SLAM2 namespace

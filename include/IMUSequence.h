@@ -19,9 +19,9 @@ public:
 
 	size_t size() { std::lock_guard<std::mutex> lck(mtx); return imuSeq.size(); } 
 
-	void reset() { std::lock_guard<std::mutex> lck(mtx); muSeq.clear(); }
+	void reset() { std::lock_guard<std::mutex> lck(mtx); imuSeq.clear(); }
 	
-	std::deque<std::pair<double, Eigen::VectorXd>> operator()(double tmin, tmax);
+	std::deque<std::pair<double, Eigen::VectorXd>> operator()(double tmin, double tmax);
 
 private:
 	int maxSeqLen;
