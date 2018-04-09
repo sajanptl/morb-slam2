@@ -25,6 +25,7 @@
 #include <opencv2/core/core.hpp>
 #include <opencv2/features2d/features2d.hpp>
 
+#include "MotionModel.h"
 #include "IMUSequence.h"
 #include "Viewer.h"
 #include "FrameDrawer.h"
@@ -183,9 +184,6 @@ protected:
 
     //Map
     Map* mpMap;
-	
-	// IMU
-	IMUSequence* mImuSeq;
 
     //Calibration matrix
     cv::Mat mK;
@@ -220,6 +218,11 @@ protected:
     bool mbRGB;
 
     list<MapPoint*> mlpTemporalPoints;
+	
+	// IMU
+	IMUSequence* mImuSeq;
+	cv::Mat lastFramePoseH;
+	KittiMotion kittiMotion;
 };
 
 } //namespace ORB_SLAM

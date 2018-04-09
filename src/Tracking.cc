@@ -23,7 +23,8 @@
 
 #include <opencv2/core/core.hpp>
 #include <opencv2/features2d/features2d.hpp>
- 
+
+#include "MotionModel.h"
 #include "IMUSequence.h"
 #include "ORBmatcher.h"
 #include "FrameDrawer.h"
@@ -813,6 +814,8 @@ void Tracking::UpdateLastFrame()
     // Update pose according to reference keyframe
     KeyFrame* pRef = mLastFrame.mpReferenceKF;
     cv::Mat Tlr = mlRelativeFramePoses.back();
+	
+	lastFramePoseH = pRef->GetPose(); // save last frame pose
 
     mLastFrame.SetPose(Tlr*pRef->GetPose());
 
@@ -884,18 +887,24 @@ bool Tracking::TrackWithMotionModel()
 
 	// TODO: Add in IMU Preintegration here
 	deque<pair<double, VectorXd>> uSeq = mImuSeq->get(mLastFrame.mTimeStamp, mCurrentFrame.mTimeStamp);
-    cv::Mat preIntTcw = cv::Mat::eye(4, 4, CV_32F);
 	
-	/*
-	auto preIntSE3Quat = some_func();
+	Vector3d p0(lastFramePoseH.at<float>(0, 2),
+				lastFramePoseH.at<float>(1, 2),
+				lastFramePoseH.at<float>(2, 2));
+	Vector3d v0(0, 0, 0);
+	Matrix3d R0;
+	for (size_t i = 0; i < 3; ++i)
+		for (size_t j = 0; j < 3; ++j) R0(i, j) = lastFramePoseH.at<float>(i, j);
+
+	auto preIntSE3Quat = kittiMotion.calc(p0, R0, v0, uSeq);
 	auto preIntH = preIntSE3Quat.to_homogeneous_matrix();
+    cv::Mat preIntTcw = cv::Mat::eye(4, 4, CV_32F);
 	for (size_t i = 0; i < 4; ++i)
 		for (size_t j = 0; j < 4; ++j) preIntTcw.at<float>(i, j) = preIntH(i, j);
 	
 	mCurrentFrame.SetPose(preIntTcw);
-	*/
 
-    mCurrentFrame.SetPose(mVelocity * mLastFrame.mTcw);
+//    mCurrentFrame.SetPose(mVelocity * mLastFrame.mTcw);
 
     fill(mCurrentFrame.mvpMapPoints.begin(),mCurrentFrame.mvpMapPoints.end(),static_cast<MapPoint*>(NULL));
 

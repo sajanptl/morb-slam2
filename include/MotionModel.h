@@ -1,16 +1,12 @@
-#include "Optimizer.h"
+#ifndef MOTIONMODEL_H
+#define MOTIONMODEL_H
 
-#include "Thirdparty/g2o/g2o/core/block_solver.h"
-#include "Thirdparty/g2o/g2o/core/optimization_algorithm_levenberg.h"
-#include "Thirdparty/g2o/g2o/solvers/linear_solver_eigen.h"
-#include "Thirdparty/g2o/g2o/types/types_six_dof_expmap.h"
-#include "Thirdparty/g2o/g2o/core/robust_kernel_impl.h"
-#include "Thirdparty/g2o/g2o/solvers/linear_solver_dense.h"
-#include "Thirdparty/g2o/g2o/types/types_seven_dof_expmap.h"
 #include "Thirdparty/g2o/g2o/types/se3_ops.h"
-#include <iostream>
+#include "Thirdparty/g2o/g2o/types/se3quat.h"
 #include <deque>
-#include <math.h>
+#include <utility>
+#include <cmath>
+#include <Eigen/Dense>
 
 // #include<Eigen/StdVector>
 // May need to include unsupported for exp or else we can do it element by element
@@ -18,7 +14,7 @@
 
 #include "Converter.h"
 #define PI 3.1415926536
-#include<mutex>
+#include <mutex>
 
 typedef Eigen::Matrix<double, 6, 1> Vector6d;
 // typedef Matrix<double, 3, 1> Vector3d;
@@ -87,7 +83,7 @@ public:
 			 + sin(theta) / theta * Omega + (1 - cos(theta)) / (theta * theta) * Omega2);
 		return R;
 	}
-	g2o::SE3Quat calc(const Eigen::Vector3d &p0, const Eigen::Matrix3d &R0, const Eigen::Vector3d &v0, const Vector6d &imu, const double &dt) {
+	g2o::SE3Quat calc(const Eigen::Vector3d &p0, const Eigen::Matrix3d &R0, Eigen::Vector3d &v0, const Eigen::VectorXd &imu, const double &dt) {
 		omega[0] = imu[3];
 		omega[1] = imu[4];
 		omega[2] = imu[5];
@@ -95,20 +91,20 @@ public:
 		a[1] = imu[1];
 		a[2] = imu[2];
 		// Update equations
-		R = R0 * exp((omega - bg) * dt);
-		v = v0 + ((a - ba) * dt);
-		p = p0 + (v0 * dt) + (0.5 * (a - ba) * pow(dt,2));
+		R   = R0 * exp((omega - bg) * dt);
+		p   = p0 + (v0 * dt) + (0.5 * (a - ba) * pow(dt,2));
+		v0 += ((a - ba) * dt);
 		g2o::SE3Quat result(R,p);
 		return result;
 	}
-	g2o::SE3Quat calc(const Eigen::Vector3d &p0, const Eigen::Matrix3d &R0, const Eigen::Vector3d &v0, deque<Vector6d> &imus, const double &dt)
+	g2o::SE3Quat calc(const Eigen::Vector3d &p0, const Eigen::Matrix3d &R0, Eigen::Vector3d &v0, const std::deque<std::pair<double, Eigen::VectorXd>> &imus)
 	{
 		g2o::SE3Quat result;
 		Eigen::Vector3d p_previous = p0;
 		Eigen::Matrix3d R_previous = R0;
-		for (int i = 0; i < int(imus.size() - 1); ++i)
+		for (size_t i = 0; i < (imus.size() - 1); ++i)
 		{
-			result = calc(p_previous, R_previous, v0, imus[i], dt);
+			result = calc(p_previous, R_previous, v0, imus[i].second, imus[i + 1].first - imus[i].first);
 			p_previous = result.translation();
 			R_previous = result.rotation().toRotationMatrix();
 		}
@@ -131,3 +127,5 @@ private:
 	Eigen::Vector3d ba;
 	Eigen::Vector3d bg;
 };
+
+#endif
