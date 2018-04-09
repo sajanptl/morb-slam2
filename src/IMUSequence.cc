@@ -1,5 +1,6 @@
 #include "IMUSequence.h"
 
+#include <iostream>
 #include <algorithm>
 #include <cmath>
 
@@ -43,12 +44,14 @@ deque<pair<double, VectorXd>> IMUSequence::operator()(double tmin, double tmax)
 	auto interp = [](double t, double t0, double dt, const VectorXd& u0, const VectorXd& du, double eps)
 					{ return (dt > eps) ? ((t - t0) / dt * du) + u0 : u0; };
 
+	std::cout << tmin << " " << low->first << std::endl;
 	if (abs(low->first - tmin) > eps) // tmin does not match low.first
 	{
+		std::cout << "Low mismatch" << std::endl;
 		// adjust forward iterators to set up interpolation
 		auto lowPrev = low;
 		auto lowNext = low;
-		if (low->first < tmin) ++lowNext;
+		if ((low->first < tmin) && ((low + 1) != imuSeq.end())) ++lowNext;
 		else if (low != imuSeq.begin()) lowPrev = imuSeq.begin() + (low - imuSeq.begin() - 1);
 		
 		// perform interpolation
@@ -58,15 +61,18 @@ deque<pair<double, VectorXd>> IMUSequence::operator()(double tmin, double tmax)
 		if (low->first < tmin) useq.front() = make_pair(tmin, ui); // overwrite first pos with tmin to make it the lowest
 		else useq.push_front(make_pair(tmin, ui)); // add to tmin to front to make it the lowest
 	}
-	
+	else std::cout << "Low Match" << std::endl;
+
 	// up is one past hi, so get pointer to hi (could be tmax or around tmax)
 	auto hi = imuSeq.begin() + (up - imuSeq.begin() - 1);
+	std::cout << tmax << " " << hi->first << std::endl;
 	if (abs(hi->first - tmax) > eps) // tmax does not match hi.first
 	{
+		std::cout << "Hi mismatch" << std::endl;
 		// adjust forward iterators to set up interpolation
 		auto hiPrev = hi;
 		auto hiNext = hi;
-		if (hi->first < tmax) ++hiNext;
+		if ((hi->first < tmax) && ((hi + 1) != imuSeq.end())) ++hiNext;
 		else if (up != imuSeq.end()) hiPrev = imuSeq.begin() + (hi - imuSeq.begin() - 1);
 
 		// preform interpolation
@@ -76,7 +82,8 @@ deque<pair<double, VectorXd>> IMUSequence::operator()(double tmin, double tmax)
 		if (hi->first > tmax) useq.back() = make_pair(tmax, ui); // overwrite last pos with tmax to make it the highest
 		else useq.push_back(make_pair(tmax, ui)); // add tmax to back to make it the highest
 	}
-	
+	else std::cout << "Hi match" << std::endl;	
+
 	return useq;
 }
 
