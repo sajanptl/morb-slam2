@@ -21,22 +21,23 @@
 
 #include "Tracking.h"
 
-#include<opencv2/core/core.hpp>
-#include<opencv2/features2d/features2d.hpp>
+#include <opencv2/core/core.hpp>
+#include <opencv2/features2d/features2d.hpp>
+ 
+#include "IMUSequence.h"
+#include "ORBmatcher.h"
+#include "FrameDrawer.h"
+#include "Converter.h"
+#include "Map.h"
+#include "Initializer.h"
 
-#include"ORBmatcher.h"
-#include"FrameDrawer.h"
-#include"Converter.h"
-#include"Map.h"
-#include"Initializer.h"
+#include "Optimizer.h"
+#include "PnPsolver.h"
 
-#include"Optimizer.h"
-#include"PnPsolver.h"
-
-#include<iostream>
-
-#include<mutex>
-
+#include <iostream>
+#include <deque>
+#include <utility>
+#include <mutex>
 
 using namespace std;
 
@@ -776,7 +777,6 @@ bool Tracking::TrackReferenceKeyFrame()
     mCurrentFrame.mvpMapPoints = vpMapPointMatches;
     mCurrentFrame.SetPose(mLastFrame.mTcw);
 	
-	// TODO: Add in IMU Preintegration???? OR leave it out?
     Optimizer::PoseOptimization(&mCurrentFrame);
 
     // Discard outliers
@@ -877,7 +877,20 @@ bool Tracking::TrackWithMotionModel()
     // Create "visual odometry" points if in Localization Mode
     UpdateLastFrame();
 
-    mCurrentFrame.SetPose(mVelocity*mLastFrame.mTcw);
+	// TODO: Add in IMU Preintegration here
+	deque<pair<double, VectorXd>> uSeq = mImuSeq->get(mLastFrame.mTimeStamp, mCurrentFrame.mTimeStamp);
+    cv::Mat preIntTcw = cv::Mat::eye(4, 4, CV_32F);
+	
+	/*
+	auto preIntSE3Quat = some_func();
+	auto preIntH = preIntSE3Quat.to_homogeneous_matrix();
+	for (size_t i = 0; i < 4; ++i)
+		for (size_t j = 0; j < 4; ++j) preIntTcw.at<float>(i, j) = preIntH(i, j);
+	
+	mCurrentFrame.SetPose(preIntTcw);
+	*/
+
+    mCurrentFrame.SetPose(mVelocity * mLastFrame.mTcw);
 
     fill(mCurrentFrame.mvpMapPoints.begin(),mCurrentFrame.mvpMapPoints.end(),static_cast<MapPoint*>(NULL));
 
@@ -898,8 +911,6 @@ bool Tracking::TrackWithMotionModel()
 
     if(nmatches<20)
         return false;
-	
-	// TODO: Add in IMU Preintegration here
 
     // Optimize frame pose with all matches
     Optimizer::PoseOptimization(&mCurrentFrame);
@@ -943,8 +954,6 @@ bool Tracking::TrackLocalMap()
 
     SearchLocalPoints();
 	
-	// TODO: Add IMU Preintegration??
-
     // Optimize Pose
     Optimizer::PoseOptimization(&mCurrentFrame);
     mnMatchesInliers = 0;
