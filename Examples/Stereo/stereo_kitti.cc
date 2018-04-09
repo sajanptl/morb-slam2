@@ -114,7 +114,8 @@ int main(int argc, char **argv)
         }
 		
         myClock::time_point t1 = myClock::now();
-        
+		// TODO: Read in IMU/Oxts file and call System.AddIMUMeasurement()
+		
 		// Pass the images to the SLAM system
         SLAM.TrackStereo(imLeft, imRight, tframe);
 	
