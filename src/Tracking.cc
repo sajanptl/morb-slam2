@@ -163,6 +163,10 @@ void Tracking::SetViewer(Viewer *pViewer)
     mpViewer=pViewer;
 }
 
+void Tracking::SetIMUSequence(IMUSequence* pImuSeq)
+{
+	mImuSeq = pImuSeq;
+}
 
 cv::Mat Tracking::GrabImageStereo(const cv::Mat &imRectLeft, const cv::Mat &imRectRight, const double &timestamp)
 {
@@ -771,7 +775,8 @@ bool Tracking::TrackReferenceKeyFrame()
 
     mCurrentFrame.mvpMapPoints = vpMapPointMatches;
     mCurrentFrame.SetPose(mLastFrame.mTcw);
-
+	
+	// TODO: Add in IMU Preintegration???? OR leave it out?
     Optimizer::PoseOptimization(&mCurrentFrame);
 
     // Discard outliers
@@ -893,6 +898,8 @@ bool Tracking::TrackWithMotionModel()
 
     if(nmatches<20)
         return false;
+	
+	// TODO: Add in IMU Preintegration here
 
     // Optimize frame pose with all matches
     Optimizer::PoseOptimization(&mCurrentFrame);
@@ -935,6 +942,8 @@ bool Tracking::TrackLocalMap()
     UpdateLocalMap();
 
     SearchLocalPoints();
+	
+	// TODO: Add IMU Preintegration??
 
     // Optimize Pose
     Optimizer::PoseOptimization(&mCurrentFrame);

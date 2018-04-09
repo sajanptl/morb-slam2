@@ -29,9 +29,12 @@
 namespace ORB_SLAM2
 {
 
-System::System(const string &strVocFile, const string &strSettingsFile, const eSensor sensor,
-               const bool bUseViewer):mSensor(sensor), mpViewer(static_cast<Viewer*>(NULL)), mbReset(false),mbActivateLocalizationMode(false),
-        mbDeactivateLocalizationMode(false)
+System::System(const string &strVocFile, 
+			   const string &strSettingsFile, 
+			   const eSensor sensor,
+               const bool bUseViewer) 
+	: mSensor(sensor), mpViewer(static_cast<Viewer*>(NULL)), mbReset(false), 
+	  mbActivateLocalizationMode(false), mbDeactivateLocalizationMode(false)
 {
     // Output welcome message
     cout << endl <<
@@ -76,6 +79,9 @@ System::System(const string &strVocFile, const string &strSettingsFile, const eS
 
     //Create the Map
     mpMap = new Map();
+	
+	// allocate IMUSequence
+	mImuSeq = new IMUSequence();
 
     //Create Drawers. These are used by the Viewer
     mpFrameDrawer = new FrameDrawer(mpMap);
@@ -105,6 +111,7 @@ System::System(const string &strVocFile, const string &strSettingsFile, const eS
     //Set pointers between threads
     mpTracker->SetLocalMapper(mpLocalMapper);
     mpTracker->SetLoopClosing(mpLoopCloser);
+	mpTracker->SetIMUSequence(mImuSeq);
 
     mpLocalMapper->SetTracker(mpTracker);
     mpLocalMapper->SetLoopCloser(mpLoopCloser);
@@ -112,6 +119,13 @@ System::System(const string &strVocFile, const string &strSettingsFile, const eS
     mpLoopCloser->SetTracker(mpTracker);
     mpLoopCloser->SetLocalMapper(mpLocalMapper);
 }
+
+
+void System::AddIMUMeasurement(const Eigen::VectorXd& imu, const double& timestamp)
+{
+	if (mImuSeq) mImuSeq->add(imu, timestamp);
+}
+
 
 cv::Mat System::TrackStereo(const cv::Mat &imLeft, const cv::Mat &imRight, const double &timestamp)
 {
@@ -310,6 +324,12 @@ void System::Shutdown()
         delete mpViewer;
         mpViewer = static_cast<Viewer*>(nullptr);
     }
+	
+	if (mImuSeq)
+	{
+		delete mImuSeq;
+		mImuSeq = static_cast<IMUSequence*>(nullptr);
+	}
 
     // Wait until all thread have effectively stopped
     while (!mpLocalMapper->isFinished() || !mpLoopCloser->isFinished() 

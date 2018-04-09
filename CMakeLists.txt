@@ -68,6 +68,7 @@ src/KeyFrameDatabase.cc
 src/Sim3Solver.cc
 src/Initializer.cc
 src/Viewer.cc
+src/IMUSequence.cc
 )
 
 target_link_libraries(${PROJECT_NAME}
@@ -111,3 +112,6 @@ add_executable(mono_euroc
 Examples/Monocular/mono_euroc.cc)
 target_link_libraries(mono_euroc ${PROJECT_NAME})
 
+set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${PROJECT_SOURCE_DIR})
+add_executable(test_seq src/testSequence.cc)
+target_link_libraries(test_seq ${PROJECT_NAME})

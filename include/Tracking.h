@@ -22,18 +22,19 @@
 #ifndef TRACKING_H
 #define TRACKING_H
 
-#include<opencv2/core/core.hpp>
-#include<opencv2/features2d/features2d.hpp>
+#include <opencv2/core/core.hpp>
+#include <opencv2/features2d/features2d.hpp>
 
-#include"Viewer.h"
-#include"FrameDrawer.h"
-#include"Map.h"
-#include"LocalMapping.h"
-#include"LoopClosing.h"
-#include"Frame.h"
+#include "IMUSequence.h"
+#include "Viewer.h"
+#include "FrameDrawer.h"
+#include "Map.h"
+#include "LocalMapping.h"
+#include "LoopClosing.h"
+#include "Frame.h"
 #include "ORBVocabulary.h"
-#include"KeyFrameDatabase.h"
-#include"ORBextractor.h"
+#include "KeyFrameDatabase.h"
+#include "ORBextractor.h"
 #include "Initializer.h"
 #include "MapDrawer.h"
 #include "System.h"
@@ -43,6 +44,7 @@
 namespace ORB_SLAM2
 {
 
+class IMUSequence;
 class Viewer;
 class FrameDrawer;
 class Map;
@@ -65,6 +67,7 @@ public:
     void SetLocalMapper(LocalMapping* pLocalMapper);
     void SetLoopClosing(LoopClosing* pLoopClosing);
     void SetViewer(Viewer* pViewer);
+	void SetIMUSequence(IMUSequence* pImuSeq);
 
     // Load new settings
     // The focal lenght should be similar or scale prediction will fail when projecting points
@@ -180,6 +183,9 @@ protected:
 
     //Map
     Map* mpMap;
+	
+	// IMU
+	IMUSequence* mImuSeq;
 
     //Calibration matrix
     cv::Mat mK;
