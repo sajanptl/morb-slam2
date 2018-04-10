@@ -19,18 +19,18 @@
 */
 
 
-#include<iostream>
-#include<algorithm>
-#include<fstream>
-#include<chrono>
+#include <iostream>
+#include <algorithm>
+#include <fstream>
+#include <chrono>
 
-#include<ros/ros.h>
+#include <ros/ros.h>
 #include <cv_bridge/cv_bridge.h>
 #include <message_filters/subscriber.h>
 #include <message_filters/time_synchronizer.h>
 #include <message_filters/sync_policies/approximate_time.h>
 
-#include<opencv2/core/core.hpp>
+#include <opencv2/core/core.hpp>
 
 #include"../../../include/System.h"
 
@@ -42,6 +42,7 @@ public:
     ImageGrabber(ORB_SLAM2::System* pSLAM) : mpSLAM(pSLAM) {}
 
     void GrabRGBD(const sensor_msgs::ImageConstPtr& msgRGB, const sensor_msgs::ImageConstPtr& msgD);
+	void GrabIMU(const sensor_msgs::ImuConstPtr& msgIMU);
 
     ORB_SLAM2::System* mpSLAM;
 };
@@ -66,12 +67,15 @@ int main(int argc, char **argv)
     ros::NodeHandle nh;
 
 //    message_filters::Subscriber<sensor_msgs::Image> rgb_sub(nh, "/camera/rgb/image_raw", 1);
-    message_filters::Subscriber<sensor_msgs::Image> rgb_sub(nh, "/hsrb/head_rgbd_sensor/rgb/image_raw", 1);
 //    message_filters::Subscriber<sensor_msgs::Image> depth_sub(nh, "camera/depth_registered/image_raw", 1);
+    message_filters::Subscriber<sensor_msgs::Image> rgb_sub(nh, "/hsrb/head_rgbd_sensor/rgb/image_raw", 1);
     message_filters::Subscriber<sensor_msgs::Image> depth_sub(nh, "/hsrb/head_rgbd_sensor/depth_registered/image_raw", 1);
     typedef message_filters::sync_policies::ApproximateTime<sensor_msgs::Image, sensor_msgs::Image> sync_pol;
     message_filters::Synchronizer<sync_pol> sync(sync_pol(10), rgb_sub, depth_sub);
     sync.registerCallback(boost::bind(&ImageGrabber::GrabRGBD, &igb, _1, _2));
+	
+	message_filters::Subscriber<sensor_msgs::Imu> imu_sub(nh, "/hsrb/base_imu/data", 1); // TODO confirm channel name
+	imu_sub.registerCallback(bost::bind(&ImageGrabber::GrabIMU, &igb, _1));
 
     ros::spin();
 
@@ -79,7 +83,7 @@ int main(int argc, char **argv)
     SLAM.Shutdown();
 
     // Save camera trajectory
-    SLAM.SaveKeyFrameTrajectoryTUM("/home/sajanptl/morb-slam-maps/KeyFrameTrajectory.txt");
+    SLAM.SaveKeyFrameTrajectoryTUM("/home/sajanptl/morb-slam-maps/HSR_RGBD_KeyFrameTrajectory.txt");
 
     ros::shutdown();
 
@@ -115,3 +119,11 @@ void ImageGrabber::GrabRGBD(const sensor_msgs::ImageConstPtr& msgRGB, const sens
 }
 
 
+void ImageGrabber::GrabIMU(const sensor_msgs::ImuConstPtr& msgIMU)
+{
+	VectorXd u(6);
+	u << 
+		msgIMU->
+	
+	mpSLAM->AddIMUMeasurement(u, msgIMU->header.stamp.toSec());
+}
