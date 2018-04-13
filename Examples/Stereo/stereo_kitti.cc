@@ -25,6 +25,8 @@
 #include <chrono>
 #include <vector>
 #include <string>
+#include <sstream>
+#include <iomanip>
 
 #include <opencv2/core/core.hpp>
 
@@ -62,11 +64,18 @@ using cv::imread;
 // ORB_SLAM2 aliasing
 using ORB_SLAM2::System;
 
+typedef Eigen::Matrix<double, 6, 1> Vector6d;
 /**
  * @brief Loads in the filenames of images and timestamps for a given sequence.
  */
 void LoadImages(const string &strPathToSequence, vector<string> &vstrImageLeft,
-                vector<string> &vstrImageRight, vector<double> &vTimestamps);
+                vector<string> &vstrImageRight, vector<double> &vTimestamps, vector<string> &imuLines);
+
+string generateIMUFilename(int n);
+
+Eigen::VectorXd parseIMULine(string imuLine);
+
+double timestampsLineToDouble(string line);
 
 /**
  * @brief Main driver for the Stereo Kitti experiment.
@@ -82,8 +91,10 @@ int main(int argc, char **argv)
     // Retrieve paths to images
     vector<string> vstrImageLeft;
     vector<string> vstrImageRight;
+    vector<string> imuLines;
     vector<double> vTimestamps;
-    LoadImages(string(argv[3]), vstrImageLeft, vstrImageRight, vTimestamps);
+    vector<double> iTimestamps;
+    LoadImages(string(argv[3]), vstrImageLeft, vstrImageRight, vTimestamps, imuLines);
 
     const size_t nImages = vstrImageLeft.size();
 
@@ -112,9 +123,11 @@ int main(int argc, char **argv)
             cerr << endl << "Failed to load image at: " << string(vstrImageLeft[ni]) << endl;
             return 1;
         }
-		
+        
         myClock::time_point t1 = myClock::now();
-		// TODO: Read in IMU/Oxts file and call System.AddIMUMeasurement()
+        // TODO: Read in IMU/Oxts file and call System.AddIMUMeasurement()
+        SLAM.AddIMUMeasurement(parseIMULine(imuLines[ni]), vTimestamps[ni]);
+        // END TODO
 		
 		// Pass the images to the SLAM system
         SLAM.TrackStereo(imLeft, imRight, tframe);
@@ -158,7 +171,7 @@ int main(int argc, char **argv)
 }
 
 void LoadImages(const string &strPathToSequence, vector<string> &vstrImageLeft,
-                vector<string> &vstrImageRight, vector<double> &vTimestamps)
+                vector<string> &vstrImageRight, vector<double> &vTimestamps, vector<string> &imuLines)
 {
     ifstream fTimes;
     string strPathTimeFile = strPathToSequence + "/times.txt";
@@ -177,17 +190,67 @@ void LoadImages(const string &strPathToSequence, vector<string> &vstrImageLeft,
         }
     }
 
+
     string strPrefixLeft  = strPathToSequence + "/image_0/";
     string strPrefixRight = strPathToSequence + "/image_1/";
 
     const size_t nTimes = vTimestamps.size();
     vstrImageLeft.resize(nTimes);
     vstrImageRight.resize(nTimes);
+    imuLines.resize(nTimes);
     for (size_t i=0; i < nTimes; ++i)
     {
+        ifstream imuFile;
+        string strPathIMUFile = strPathToSequence + "oxts/data/" + generateIMUFilename(i);
+        imuFile.open(strPathIMUFile.c_str());
+        getline(imuFile, imuLines[i]);
         stringstream ss;
         ss << setfill('0') << setw(6) << to_string(i);
         vstrImageLeft[i]  = strPrefixLeft + ss.str() + ".png";
         vstrImageRight[i] = strPrefixRight + ss.str() + ".png";
     }
+}
+
+string generateIMUFilename(int n) {
+    stringstream IMUFilename;
+    IMUFilename << setfill('0') << setw(10) << n;
+    return IMUFilename.str() + ".txt";
+}
+
+Eigen::VectorXd parseIMULine(string imuLine) {
+    Eigen:Vector6d imu;
+    stringstream ss(imuLine);
+    int counter = 0;
+    double datum;
+    while (ss >> datum) {
+        // ax = 11, ay = 12, az = 13
+        // wx = 17, wy = 18, wz = 19
+        if (counter == 11) {
+            imu[0] = datum;
+        }
+        else if (counter == 12) {
+            imu[1] = datum;
+        }
+        else if (counter == 13) {
+            imu[2] = datum;
+        }
+        else if (counter == 17) {
+            imu[3] = datum;
+        }
+        else if (counter == 18) {
+            imu[4] = datum;
+        }
+        else if (counter == 19) {
+            imu[5] = datum;
+        }
+        ++counter;
+    }
+    return imu;
+}
+
+double timestampsLineToDouble(string line) {
+    double year, month, day, hours, minutes, seconds;
+    sscanf(line.c_str(), "%lf-%lf-%lf %lf:%lf:%lf", &year, &month, &day, &hours, &minutes, &seconds);
+    // Assumption: We do not cross over a month or a year, only consider days because there are fewer excepions in computation
+    return (day * 86400) + (hours * 3600) + (minutes * 60) + seconds;
 }

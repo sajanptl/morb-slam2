@@ -49,7 +49,7 @@ public:
 class KittiMotion : public MotionBase
 {
 public:
-	KittiMotion()
+	KittiMotion(Eigen::Vector3d v0) : v
 	{
 		p << 0,
 			 0,
@@ -87,7 +87,7 @@ public:
 			 + sin(theta) / theta * Omega + (1 - cos(theta)) / (theta * theta) * Omega2);
 		return R;
 	}
-	g2o::SE3Quat calc(const Eigen::Vector3d &p0, const Eigen::Matrix3d &R0, const Eigen::Vector3d &v0, const Vector6d &imu, const double &dt) {
+	g2o::SE3Quat calc(const Eigen::Vector3d &p0, const Eigen::Matrix3d &R0, const Vector6d &imu, const double &dt) {
 		omega[0] = imu[3];
 		omega[1] = imu[4];
 		omega[2] = imu[5];
@@ -96,12 +96,13 @@ public:
 		a[2] = imu[2];
 		// Update equations
 		R = R0 * exp((omega - bg) * dt);
-		v = v0 + ((a - ba) * dt);
 		p = p0 + (v0 * dt) + (0.5 * (a - ba) * pow(dt,2));
+		v = v + ((a - ba) * dt);
+		cout << v << "\n";
 		g2o::SE3Quat result(R,p);
 		return result;
 	}
-	g2o::SE3Quat calc(const Eigen::Vector3d &p0, const Eigen::Matrix3d &R0, const Eigen::Vector3d &v0, deque<Vector6d> &imus, const double &dt)
+	g2o::SE3Quat calc(const Eigen::Vector3d &p0, const Eigen::Matrix3d &R0, deque<Vector6d> &imus, const double &dt)
 	{
 		g2o::SE3Quat result;
 		Eigen::Vector3d p_previous = p0;

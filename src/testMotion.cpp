@@ -21,7 +21,7 @@ void stayTest()
 	v0 << 0,
 		  0,
 		  0;
-	imu << 0, 0, 0, 0, 0, 0;
+	imu << 1, 0, 0, 0, 0, 0;
 	double dt = 1;
 	quat_result = testObject.calc(p0, R0, v0, imu, dt);
 	cout << "Start:\n" << p0 << "\n" << R0 << "\n";
@@ -49,7 +49,7 @@ void stayTestIterative()
 	v0 << 1,
 		  0,
 		  0;
-	imu << 0, 0, 0, 0, 0, 0;
+	imu << 1, 0, 0, 0, 0, 0;
 	for (int i = 0; i < 10; ++i)
 	{
 		imus.push_back(imu);
