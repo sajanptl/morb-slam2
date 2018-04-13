@@ -815,148 +815,157 @@ void Tracking::UpdateLastFrame()
     KeyFrame* pRef = mLastFrame.mpReferenceKF;
     cv::Mat Tlr = mlRelativeFramePoses.back();
 	
-	lastFramePoseH = pRef->GetPose(); // save last frame pose
+	lastFramePoseH = pRef->GetPose().clone(); // save last frame pose
 
-    mLastFrame.SetPose(Tlr*pRef->GetPose());
+    mLastFrame.SetPose(Tlr * pRef->GetPose());
 
-    if(mnLastKeyFrameId==mLastFrame.mnId || mSensor==System::MONOCULAR || !mbOnlyTracking)
+    if ((mnLastKeyFrameId == mLastFrame.mnId) || (mSensor == System::MONOCULAR) || !mbOnlyTracking)
         return;
 
     // Create "visual odometry" MapPoints
     // We sort points according to their measured depth by the stereo/RGB-D sensor
-    vector<pair<float,int> > vDepthIdx;
+    vector<pair<float, int>> vDepthIdx;
     vDepthIdx.reserve(mLastFrame.N);
-    for(int i=0; i<mLastFrame.N;i++)
+    for (int i = 0; i < mLastFrame.N; ++i)
     {
         float z = mLastFrame.mvDepth[i];
-        if(z>0)
-        {
-            vDepthIdx.push_back(make_pair(z,i));
-        }
+        if (z > 0) vDepthIdx.push_back(make_pair(z, i));
     }
 
-    if(vDepthIdx.empty())
-        return;
+    if (vDepthIdx.empty()) return;
 
-    sort(vDepthIdx.begin(),vDepthIdx.end());
+    sort(vDepthIdx.begin(), vDepthIdx.end());
 
     // We insert all close points (depth<mThDepth)
     // If less than 100 close points, we insert the 100 closest ones.
-    int nPoints = 0;
-    for(size_t j=0; j<vDepthIdx.size();j++)
+//    int nPoints = 0;
+    for (size_t j = 0; j < vDepthIdx.size(); ++j)
     {
         int i = vDepthIdx[j].second;
 
         bool bCreateNew = false;
 
         MapPoint* pMP = mLastFrame.mvpMapPoints[i];
-        if(!pMP)
-            bCreateNew = true;
-        else if(pMP->Observations()<1)
-        {
-            bCreateNew = true;
-        }
-
-        if(bCreateNew)
+        if (!pMP) bCreateNew = true;
+        else if (pMP->Observations() < 1) bCreateNew = true;
+		
+        if (bCreateNew)
         {
             cv::Mat x3D = mLastFrame.UnprojectStereo(i);
-            MapPoint* pNewMP = new MapPoint(x3D,mpMap,&mLastFrame,i);
+            MapPoint* pNewMP = new MapPoint(x3D, mpMap, &mLastFrame, i);
 
-            mLastFrame.mvpMapPoints[i]=pNewMP;
+            mLastFrame.mvpMapPoints[i] = pNewMP;
 
             mlpTemporalPoints.push_back(pNewMP);
-            nPoints++;
+ //           ++nPoints;
         }
-        else
-        {
-            nPoints++;
-        }
+//        else
+//        {
+//            ++nPoints;
+//        }
 
-        if(vDepthIdx[j].first>mThDepth && nPoints>100)
-            break;
+		// using j instead of nPoints
+        if ((vDepthIdx[j].first > mThDepth) && (j > 100)) break;
     }
 }
 
 bool Tracking::TrackWithMotionModel()
 {
-    ORBmatcher matcher(0.9,true);
+    ORBmatcher matcher(0.9, true);
 
     // Update last frame pose according to its reference keyframe
     // Create "visual odometry" points if in Localization Mode
     UpdateLastFrame();
+//	cout << "IMU Seq Length: " << mImuSeq->size() << endl;
 
-	// TODO: Add in IMU Preintegration here
-	deque<pair<double, VectorXd>> uSeq = mImuSeq->get(mLastFrame.mTimeStamp, mCurrentFrame.mTimeStamp);
+	if (mImuSeq->size() < 2)
+	{
+		cout << "Last Frame: " << lastFramePoseH << endl;
+		cout << "VO Pred Frame: " << mVelocity * mLastFrame.mTcw << endl;
+		mCurrentFrame.SetPose(mVelocity * mLastFrame.mTcw);
+	}
+	else
+	{	
+//		cout << "Grabbing IMU values" << endl;
+		// TODO: Add in IMU Preintegration here
+		deque<pair<double, VectorXd>> uSeq = mImuSeq->get(mLastFrame.mTimeStamp, 
+														  mCurrentFrame.mTimeStamp);
+		
+		Vector3d p0(lastFramePoseH.at<float>(0, 2),
+					lastFramePoseH.at<float>(1, 2),
+					lastFramePoseH.at<float>(2, 2));
+		Vector3d v0(0, 0, 0);
+		Matrix3d R0;
+		for (size_t i = 0; i < 3; ++i)
+			for (size_t j = 0; j < 3; ++j) R0(i, j) = lastFramePoseH.at<float>(i, j);
+
+		auto preIntSE3Quat = kittiMotion.calc(p0, R0, v0, uSeq);
+		auto preIntH = preIntSE3Quat.to_homogeneous_matrix();
+		cv::Mat preIntTcw = cv::Mat::eye(4, 4, CV_32F);
+		for (size_t i = 0; i < 4; ++i)
+			for (size_t j = 0; j < 4; ++j) preIntTcw.at<float>(i, j) = preIntH(i, j);
 	
-	Vector3d p0(lastFramePoseH.at<float>(0, 2),
-				lastFramePoseH.at<float>(1, 2),
-				lastFramePoseH.at<float>(2, 2));
-	Vector3d v0(0, 0, 0);
-	Matrix3d R0;
-	for (size_t i = 0; i < 3; ++i)
-		for (size_t j = 0; j < 3; ++j) R0(i, j) = lastFramePoseH.at<float>(i, j);
+		cout << "Last Frame: " << lastFramePoseH << endl;
+		cout << "VO Pred Frame: " << mVelocity * mLastFrame.mTcw << endl;
+		cout << "PreInt Frame: " << preIntTcw << endl;
+		mCurrentFrame.SetPose(preIntTcw);
+	}
 
-	auto preIntSE3Quat = kittiMotion.calc(p0, R0, v0, uSeq);
-	auto preIntH = preIntSE3Quat.to_homogeneous_matrix();
-    cv::Mat preIntTcw = cv::Mat::eye(4, 4, CV_32F);
-	for (size_t i = 0; i < 4; ++i)
-		for (size_t j = 0; j < 4; ++j) preIntTcw.at<float>(i, j) = preIntH(i, j);
-	
-	mCurrentFrame.SetPose(preIntTcw);
-
-//    mCurrentFrame.SetPose(mVelocity * mLastFrame.mTcw);
-
-    fill(mCurrentFrame.mvpMapPoints.begin(),mCurrentFrame.mvpMapPoints.end(),static_cast<MapPoint*>(NULL));
+    fill(mCurrentFrame.mvpMapPoints.begin(), mCurrentFrame.mvpMapPoints.end(), 
+		 static_cast<MapPoint*>(NULL));
 
     // Project points seen in previous frame
-    int th;
-    if(mSensor!=System::STEREO)
-        th=15;
-    else
-        th=7;
-    int nmatches = matcher.SearchByProjection(mCurrentFrame,mLastFrame,th,mSensor==System::MONOCULAR);
+    int th = (mSensor != System::STEREO) ? 15 : 7;
 
+    int nmatches = matcher.SearchByProjection(mCurrentFrame, mLastFrame, th, 
+											  mSensor == System::MONOCULAR);
+	
     // If few matches, uses a wider window search
-    if(nmatches<20)
+    if (nmatches < 20)
     {
-        fill(mCurrentFrame.mvpMapPoints.begin(),mCurrentFrame.mvpMapPoints.end(),static_cast<MapPoint*>(NULL));
-        nmatches = matcher.SearchByProjection(mCurrentFrame,mLastFrame,2*th,mSensor==System::MONOCULAR);
+        fill(mCurrentFrame.mvpMapPoints.begin(), mCurrentFrame.mvpMapPoints.end(),
+			 static_cast<MapPoint*>(NULL));
+        nmatches = matcher.SearchByProjection(mCurrentFrame, mLastFrame, 2 * th,
+											  mSensor == System::MONOCULAR);
     }
 
-    if(nmatches<20)
-        return false;
+    if (nmatches < 20) return false;
 
     // Optimize frame pose with all matches
     Optimizer::PoseOptimization(&mCurrentFrame);
+	
+	cout << "Optimized Frame: " << mCurrentFrame.mTcw << endl;
 
     // Discard outliers
     int nmatchesMap = 0;
-    for(int i =0; i<mCurrentFrame.N; i++)
+    for (int i = 0; i < mCurrentFrame.N; ++i)
     {
-        if(mCurrentFrame.mvpMapPoints[i])
+        if (mCurrentFrame.mvpMapPoints[i])
         {
-            if(mCurrentFrame.mvbOutlier[i])
+            if (mCurrentFrame.mvbOutlier[i])
             {
                 MapPoint* pMP = mCurrentFrame.mvpMapPoints[i];
 
-                mCurrentFrame.mvpMapPoints[i]=static_cast<MapPoint*>(NULL);
-                mCurrentFrame.mvbOutlier[i]=false;
+                mCurrentFrame.mvpMapPoints[i] = static_cast<MapPoint*>(NULL);
+                mCurrentFrame.mvbOutlier[i] = false;
                 pMP->mbTrackInView = false;
                 pMP->mnLastFrameSeen = mCurrentFrame.mnId;
-                nmatches--;
+                --nmatches;
             }
-            else if(mCurrentFrame.mvpMapPoints[i]->Observations()>0)
-                nmatchesMap++;
+            else if (mCurrentFrame.mvpMapPoints[i]->Observations() > 0)
+			{
+                ++nmatchesMap;
+			}
         }
     }    
 
-    if(mbOnlyTracking)
+    if (mbOnlyTracking)
     {
-        mbVO = nmatchesMap<10;
-        return nmatches>20;
+        mbVO = nmatchesMap < 10;
+        return nmatches > 20;
     }
 
-    return nmatchesMap>=10;
+    return nmatchesMap >= 10;
 }
 
 bool Tracking::TrackLocalMap()
@@ -1543,6 +1552,13 @@ void Tracking::Reset()
         while(!mpViewer->isStopped())
             usleep(3000);
     }
+	
+	// Reset IMU Sequence
+	/*
+	cout << "Resetting IMU Sequence...";
+	mImuSeq->reset();
+	cout << " done" << endl;
+	*/
 
     // Reset Local Mapping
     cout << "Reseting Local Mapper...";

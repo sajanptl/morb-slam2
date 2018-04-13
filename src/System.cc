@@ -26,6 +26,10 @@
 #include <pangolin/pangolin.h>
 #include <iomanip>
 
+#include <iostream>
+
+using namespace std;
+
 namespace ORB_SLAM2
 {
 
@@ -37,7 +41,7 @@ System::System(const string &strVocFile,
 	  mbActivateLocalizationMode(false), mbDeactivateLocalizationMode(false)
 {
     // Output welcome message
-    cout << endl <<
+    cout << endl << "MORB-SLAM2_______________________"<< endl <<
     "ORB-SLAM2 Copyright (C) 2014-2016 Raul Mur-Artal, University of Zaragoza." << endl <<
     "This program comes with ABSOLUTELY NO WARRANTY;" << endl  <<
     "This is free software, and you are welcome to redistribute it" << endl <<
@@ -123,7 +127,8 @@ System::System(const string &strVocFile,
 
 void System::AddIMUMeasurement(const Eigen::VectorXd& imu, const double& timestamp)
 {
-	if (mImuSeq) mImuSeq->add(imu, timestamp);
+//	cout << "Got IMU" << endl;
+	if (mImuSeq) mImuSeq->add(imu, timestamp); //cout << "Adding IMU" << endl;}
 }
 
 

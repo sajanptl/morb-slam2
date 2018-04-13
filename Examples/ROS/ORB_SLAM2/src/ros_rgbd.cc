@@ -26,25 +26,30 @@
 
 #include <ros/ros.h>
 #include <cv_bridge/cv_bridge.h>
+#include <sensor_msgs/Imu.h>
 #include <message_filters/subscriber.h>
 #include <message_filters/time_synchronizer.h>
 #include <message_filters/sync_policies/approximate_time.h>
 
 #include <opencv2/core/core.hpp>
 
+#include <Eigen/Core>
+
 #include"../../../include/System.h"
 
+using Eigen::VectorXd;
 using namespace std;
 
 class ImageGrabber
 {
 public:
-    ImageGrabber(ORB_SLAM2::System* pSLAM) : mpSLAM(pSLAM) {}
+    ImageGrabber(ORB_SLAM2::System* pSLAM) : mpSLAM(pSLAM), prevFrameTime(0) {}
 
     void GrabRGBD(const sensor_msgs::ImageConstPtr& msgRGB, const sensor_msgs::ImageConstPtr& msgD);
 	void GrabIMU(const sensor_msgs::ImuConstPtr& msgIMU);
 
     ORB_SLAM2::System* mpSLAM;
+	double prevFrameTime;
 };
 
 int main(int argc, char **argv)
@@ -63,6 +68,7 @@ int main(int argc, char **argv)
     ORB_SLAM2::System SLAM(argv[1], argv[2], ORB_SLAM2::System::RGBD, true);
 
     ImageGrabber igb(&SLAM);
+//    ImageGrabber igb(nullptr);
 
     ros::NodeHandle nh;
 
@@ -75,7 +81,7 @@ int main(int argc, char **argv)
     sync.registerCallback(boost::bind(&ImageGrabber::GrabRGBD, &igb, _1, _2));
 	
 	message_filters::Subscriber<sensor_msgs::Imu> imu_sub(nh, "/hsrb/base_imu/data", 1); // TODO confirm channel name
-	imu_sub.registerCallback(bost::bind(&ImageGrabber::GrabIMU, &igb, _1));
+	imu_sub.registerCallback(boost::bind(&ImageGrabber::GrabIMU, &igb, _1));
 
     ros::spin();
 
@@ -115,6 +121,10 @@ void ImageGrabber::GrabRGBD(const sensor_msgs::ImageConstPtr& msgRGB, const sens
         return;
     }
 
+//	cout << "Prev Frame: " << prevFrameTime << "\tCurrent Frame: ";
+    double curTime = cv_ptrRGB->header.stamp.toSec();
+//	cout << "Current Frame: " << curTime << endl;
+	prevFrameTime = curTime;
     mpSLAM->TrackRGBD(cv_ptrRGB->image, cv_ptrD->image, cv_ptrRGB->header.stamp.toSec());
 }
 
@@ -122,8 +132,11 @@ void ImageGrabber::GrabRGBD(const sensor_msgs::ImageConstPtr& msgRGB, const sens
 void ImageGrabber::GrabIMU(const sensor_msgs::ImuConstPtr& msgIMU)
 {
 	VectorXd u(6);
-	u << 
-		msgIMU->
+	u << msgIMU->linear_acceleration.x, msgIMU->linear_acceleration.y,
+		 msgIMU->linear_acceleration.z, msgIMU->angular_velocity.x,
+		 msgIMU->angular_velocity.y, msgIMU->angular_velocity.z;
 	
+//	cout << "IMU T: " << msgIMU->header.stamp.toSec() << "\t" << u.transpose() << endl;
+
 	mpSLAM->AddIMUMeasurement(u, msgIMU->header.stamp.toSec());
 }
