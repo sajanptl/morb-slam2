@@ -1,16 +1,12 @@
-#include "Optimizer.h"
+#ifndef MOTIONMODEL_H
+#define MOTIONMODEL_H
 
-#include "Thirdparty/g2o/g2o/core/block_solver.h"
-#include "Thirdparty/g2o/g2o/core/optimization_algorithm_levenberg.h"
-#include "Thirdparty/g2o/g2o/solvers/linear_solver_eigen.h"
-#include "Thirdparty/g2o/g2o/types/types_six_dof_expmap.h"
-#include "Thirdparty/g2o/g2o/core/robust_kernel_impl.h"
-#include "Thirdparty/g2o/g2o/solvers/linear_solver_dense.h"
-#include "Thirdparty/g2o/g2o/types/types_seven_dof_expmap.h"
 #include "Thirdparty/g2o/g2o/types/se3_ops.h"
-#include <iostream>
+#include "Thirdparty/g2o/g2o/types/se3quat.h"
 #include <deque>
-#include <math.h>
+#include <utility>
+#include <cmath>
+#include <Eigen/Dense>
 
 // #include<Eigen/StdVector>
 // May need to include unsupported for exp or else we can do it element by element
@@ -18,7 +14,7 @@
 
 #include "Converter.h"
 #define PI 3.1415926536
-#include<mutex>
+#include <mutex>
 
 typedef Eigen::Matrix<double, 6, 1> Vector6d;
 // typedef Matrix<double, 3, 1> Vector3d;
@@ -49,7 +45,7 @@ public:
 class KittiMotion : public MotionBase
 {
 public:
-	KittiMotion(Eigen::Vector3d v0) : v
+	KittiMotion()
 	{
 		p << 0,
 			 0,
@@ -66,12 +62,21 @@ public:
 		a << 0,
 			 0,
 			 0;
+		g << 0,
+			 0,
+			 -9.8;
 		ba << 0,
 			  0,
 			  0;
 		bg << 0,
 			  0,
 			  0;
+		etaad << 0,
+				 0,
+				 0;
+		etagd << 0,
+				 0,
+				 0;
 	}
 	~KittiMotion() {}
 	Eigen::Matrix3d exp(const Eigen::Vector3d &omega) {
@@ -87,7 +92,7 @@ public:
 			 + sin(theta) / theta * Omega + (1 - cos(theta)) / (theta * theta) * Omega2);
 		return R;
 	}
-	g2o::SE3Quat calc(const Eigen::Vector3d &p0, const Eigen::Matrix3d &R0, const Vector6d &imu, const double &dt) {
+	g2o::SE3Quat calc(const Eigen::Vector3d &p0, const Eigen::Matrix3d &R0, Eigen::Vector3d &v0, const Eigen::VectorXd &imu, const double &dt) {
 		omega[0] = imu[3];
 		omega[1] = imu[4];
 		omega[2] = imu[5];
@@ -95,25 +100,28 @@ public:
 		a[1] = imu[1];
 		a[2] = imu[2];
 		// Update equations
-		R = R0 * exp((omega - bg) * dt);
-		p = p0 + (v0 * dt) + (0.5 * (a - ba) * pow(dt,2));
-		v = v + ((a - ba) * dt);
-		cout << v << "\n";
-		g2o::SE3Quat result(R,p);
+		R   = R0 * exp((omega - bg - etagd) * dt);
+		p   = p0 + (v0 * dt) + (0.5 * g * pow(dt, 2)) + (0.5 * R0 * (a - ba - etaad) * pow(dt, 2));
+		v0 += (g * dt) + (R0 * (a - ba - etaad) * dt);
+		g2o::SE3Quat result(R, p);
 		return result;
 	}
-	g2o::SE3Quat calc(const Eigen::Vector3d &p0, const Eigen::Matrix3d &R0, deque<Vector6d> &imus, const double &dt)
+	g2o::SE3Quat calc(const Eigen::Vector3d &p0, const Eigen::Matrix3d &R0, Eigen::Vector3d &v0, const std::deque<std::pair<double, Eigen::VectorXd>> &imus)
 	{
 		g2o::SE3Quat result;
 		Eigen::Vector3d p_previous = p0;
 		Eigen::Matrix3d R_previous = R0;
-		for (int i = 0; i < int(imus.size() - 1); ++i)
+		for (size_t i = 0; i < (imus.size() - 1); ++i)
 		{
-			result = calc(p_previous, R_previous, v0, imus[i], dt);
+			result = calc(p_previous, R_previous, v0, imus[i].second, imus[i + 1].first - imus[i].first);
 			p_previous = result.translation();
 			R_previous = result.rotation().toRotationMatrix();
 		}
 		return result;
+	}
+	void setInitialV(Eigen::Vector3d v_in) {
+		v = v_in;
+		return;
 	}
 	void setLinearBias(Eigen::Vector3d ba_in) {
 		ba = ba_in;
@@ -129,6 +137,11 @@ private:
 	Eigen::Vector3d v;
 	Eigen::Vector3d omega;
 	Eigen::Vector3d a;
+	Eigen::Vector3d g;
 	Eigen::Vector3d ba;
 	Eigen::Vector3d bg;
+	Eigen::Vector3d etaad;
+	Eigen::Vector3d etagd;
 };
+
+#endif

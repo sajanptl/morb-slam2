@@ -163,7 +163,7 @@ int main(int argc, char **argv)
     cout << "mean tracking time: " << totaltime / nImages << endl;
 
     // Save camera trajectory
-    SLAM.SaveTrajectoryKITTI("CameraTrajectory.txt");
+    SLAM.SaveTrajectoryKITTI("TestOursCameraTrajectory.txt");
 	
 	cout << "Done!" << endl;
 
@@ -203,7 +203,9 @@ void LoadImages(const string &strPathToSequence, vector<string> &vstrImageLeft,
         ifstream imuFile;
         string strPathIMUFile = strPathToSequence + "oxts/data/" + generateIMUFilename(i);
         imuFile.open(strPathIMUFile.c_str());
-        getline(imuFile, imuLines[i]);
+        if (!getline(imuFile, imuLines[i])) {
+            cout << "IMU reading failed at index " << i << "\n";
+        }
         stringstream ss;
         ss << setfill('0') << setw(6) << to_string(i);
         vstrImageLeft[i]  = strPrefixLeft + ss.str() + ".png";
@@ -218,29 +220,29 @@ string generateIMUFilename(int n) {
 }
 
 Eigen::VectorXd parseIMULine(string imuLine) {
-    Eigen:Vector6d imu;
+    Eigen::VectorXd imu(6);
     stringstream ss(imuLine);
     int counter = 0;
     double datum;
     while (ss >> datum) {
         // ax = 11, ay = 12, az = 13
         // wx = 17, wy = 18, wz = 19
-        if (counter == 11) {
+        if (counter == 14) {
             imu[0] = datum;
         }
-        else if (counter == 12) {
+        else if (counter == 15) {
             imu[1] = datum;
         }
-        else if (counter == 13) {
+        else if (counter == 16) {
             imu[2] = datum;
         }
-        else if (counter == 17) {
+        else if (counter == 20) {
             imu[3] = datum;
         }
-        else if (counter == 18) {
+        else if (counter == 21) {
             imu[4] = datum;
         }
-        else if (counter == 19) {
+        else if (counter == 22) {
             imu[5] = datum;
         }
         ++counter;
