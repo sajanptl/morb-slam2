@@ -220,30 +220,51 @@ string generateIMUFilename(int n) {
 }
 
 Eigen::VectorXd parseIMULine(string imuLine) {
-    Eigen::VectorXd imu(6);
+    Eigen::VectorXd imu(9);
     stringstream ss(imuLine);
     int counter = 0;
     double datum;
     while (ss >> datum) {
         // ax = 11, ay = 12, az = 13
         // wx = 17, wy = 18, wz = 19
-        if (counter == 14) {
-            imu[0] = datum;
-        }
-        else if (counter == 15) {
-            imu[1] = datum;
-        }
-        else if (counter == 16) {
-            imu[2] = datum;
-        }
-        else if (counter == 20) {
-            imu[3] = datum;
-        }
-        else if (counter == 21) {
-            imu[4] = datum;
-        }
-        else if (counter == 22) {
-            imu[5] = datum;
+        // vf = 8,  vl = 9,  vu = 10
+        switch (counter) {
+            case 11: {
+                imu[0] = datum;
+                break;
+            }
+            case 12: {
+                imu[1] = datum;
+                break;
+            }
+            case 13: {
+                imu[2] = datum;
+                break;
+            }
+            case 17: {
+                imu[3] = datum;
+                break;
+            }
+            case 18: {
+                imu[4] = datum;
+                break;
+            }
+            case 19: {
+                imu[5] = datum;
+                break;
+            }
+            case 8: {
+                imu[6] = datum;
+                break;
+            }
+            case 9: {
+                imu[7] = datum;
+                break;
+            }
+            case 10: {
+                imu[8] = datum;
+                break;
+            }
         }
         ++counter;
     }
