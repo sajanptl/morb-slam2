@@ -47,7 +47,6 @@ public:
 
     void GrabRGBD(const sensor_msgs::ImageConstPtr& msgRGB, const sensor_msgs::ImageConstPtr& msgD);
 	void GrabIMU(const sensor_msgs::ImuConstPtr& msgIMU);
-
     ORB_SLAM2::System* mpSLAM;
 	double prevFrameTime;
 };
