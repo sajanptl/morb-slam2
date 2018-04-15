@@ -152,7 +152,8 @@ Tracking::Tracking(System *pSys, ORBVocabulary* pVoc, FrameDrawer *pFrameDrawer,
         else
             mDepthMapFactor = 1.0f/mDepthMapFactor;
     }
-
+    lastKFTime = 0;
+    lastFramePoseH = cv::Mat::eye(4, 4, CV_32F);
 }
 
 void Tracking::SetLocalMapper(LocalMapping *pLocalMapper)
@@ -816,6 +817,7 @@ void Tracking::UpdateLastFrame()
     cv::Mat Tlr = mlRelativeFramePoses.back();
 	
 	lastFramePoseH = pRef->GetPose(); // save last frame pose
+    lastKFTime = pRef->mTimeStamp;
 
     mLastFrame.SetPose(Tlr*pRef->GetPose());
 
@@ -886,30 +888,39 @@ bool Tracking::TrackWithMotionModel()
     UpdateLastFrame();
 
 	// TODO: Add in IMU Preintegration here
-	deque<pair<double, VectorXd>> uSeq = mImuSeq->get(mLastFrame.mTimeStamp, mCurrentFrame.mTimeStamp);
+    deque<pair<double, VectorXd>> uSeq = mImuSeq->get(mLastFrame.mTimeStamp, mCurrentFrame.mTimeStamp);
+	//deque<pair<double, VectorXd>> uSeq = mImuSeq->get(lastKFTime, mCurrentFrame.mTimeStamp);
 	
-	Vector3d p0(lastFramePoseH.at<float>(0, 2),
-				lastFramePoseH.at<float>(1, 2),
-				lastFramePoseH.at<float>(2, 2));
-    // Vector3d v0(0, 0, 0);
-	Vector3d v0(uSeq[0].second[6], uSeq[0].second[7], uSeq[0].second[8]);
+	//Vector3d p0(lastFramePoseH.at<float>(0, 2),
+	//			lastFramePoseH.at<float>(1, 2),
+	//			lastFramePoseH.at<float>(2, 2));
+    Vector3d p0(mLastFrame.mTcw.at<float>(0, 2),
+                mLastFrame.mTcw.at<float>(1, 2),
+                mLastFrame.mTcw.at<float>(2, 2));
+    Vector3d v0(0, 0, 0);
+	// Vector3d v0(uSeq[0].second[6], uSeq[0].second[7], uSeq[0].second[8]);
     Matrix3d R0;
     for (size_t i = 0; i < 3; ++i)
-        for (size_t j = 0; j < 3; ++j) R0(i, j) = lastFramePoseH.at<float>(i, j);
+    {
+        //for (size_t j = 0; j < 3; ++j) R0(i, j) = lastFramePoseH.at<float>(i, j);
+        for (size_t j = 0; j < 3; ++j) R0(i, j) = mLastFrame.mTcw.at<float>(i, j);
+    }
     // v0 = (R0.transpose() * v0);
-    cout << "v0\n" << v0 << "\n";
+    //cout << "v0\n" << v0 << "\n";
 
-	auto preIntSE3Quat = kittiMotion.calc(-(R0.transpose() * p0), R0.transpose(), v0, uSeq);
+	auto preIntSE3Quat = kittiMotion.calc(p0, R0, v0, uSeq);
 	auto preIntH = preIntSE3Quat.to_homogeneous_matrix();
     cv::Mat preIntTcw = cv::Mat::eye(4, 4, CV_32F);
 	for (size_t i = 0; i < 4; ++i)
 		for (size_t j = 0; j < 4; ++j) preIntTcw.at<float>(i, j) = preIntH(i, j);
 	
-	mCurrentFrame.SetPose(preIntTcw);
-    cout << "preInt: " << preIntTcw << "\n";
-    cout << "mVoRel: " << mVelocity * mLastFrame.mTcw << "\n";
+	mCurrentFrame.SetPose(preIntTcw * mLastFrame.mTcw);
+    // mCurrentFrame.SetPose(mVelocity * mLastFrame.mTcw);
+    cout << "mVeloc:\n" << mVelocity << "\n";
+    cout << "preInt:\n" << preIntTcw * mLastFrame.mTcw << "\n";
+    //cout << "preInt:\n" << preIntTcw * lastFramePoseH << "\n";
+    cout << "mVoRel:\n" << mVelocity * mLastFrame.mTcw << "\n";
 
-//    mCurrentFrame.SetPose(mVelocity * mLastFrame.mTcw);
 
     fill(mCurrentFrame.mvpMapPoints.begin(),mCurrentFrame.mvpMapPoints.end(),static_cast<MapPoint*>(NULL));
 

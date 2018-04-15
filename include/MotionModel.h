@@ -100,9 +100,10 @@ public:
 		a[1] = imu[1];
 		a[2] = imu[2];
 		// Update equations
+		v0  = Eigen::Vector3d(imu[6], imu[7], imu[8]);
 		R   = R0 * exp((omega - bg - etagd) * dt);
-		p   = p0 + (v0 * dt) + (0.5 * g * pow(dt, 2)) + (0.5 * R0 * (a - ba - etaad) * pow(dt, 2));
-		v0 += (g * dt) + (R0 * (a - ba - etaad) * dt);
+		p   = p0 + (R0 * v0 * dt) + (0.5 * g * (dt * dt)) + (0.5 * R0 * (a - ba - etaad) * (dt * dt));
+		// v0 += (g * dt) + (R0 * (a - ba - etaad) * dt);
 		g2o::SE3Quat result(R, p);
 		return result;
 	}

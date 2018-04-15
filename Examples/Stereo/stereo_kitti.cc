@@ -268,7 +268,25 @@ Eigen::VectorXd parseIMULine(string imuLine) {
         }
         ++counter;
     }
-    return imu;
+    // For remapping, indices of imu to camera
+    // ax = 0, ay = 1, az = 2
+    // wx = 3, wy = 4, wz = 5
+    // vf = 6, vl = 7, vu = 8
+    // Pattern:
+    // x_cam = -y_imu
+    // y_cam = -z_imu
+    // z_cam =  x_imu
+    Eigen::VectorXd temp(9);
+    temp[0] = -imu[1];
+    temp[1] = -imu[2];
+    temp[2] =  imu[0];
+    temp[3] = -imu[4];
+    temp[4] = -imu[5];
+    temp[5] =  imu[3];
+    temp[6] = -imu[7];
+    temp[7] = -imu[8];
+    temp[8] =  imu[6];
+    return temp;
 }
 
 double timestampsLineToDouble(string line) {

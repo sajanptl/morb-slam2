@@ -222,6 +222,7 @@ protected:
 	// IMU
 	IMUSequence* mImuSeq;
 	cv::Mat lastFramePoseH;
+    double lastKFTime;
 	KittiMotion kittiMotion;
 };
 
