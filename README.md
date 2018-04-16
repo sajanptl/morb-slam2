@@ -3,11 +3,9 @@ Repository for UMich ROB 530 W18 Term Project: Extending ORB SLAM 2 with Robot-S
 
 Group Members (at the University of Michigan): Sajan Patel (sajanptl), Lee Rutledge (leerut), Yida Liu, Die Hu, Purva Kulkarni
 
-The following documentation on installation and setup is sampled from ORB SLAM2's README. Follow it for instructions on all the dependencies that must be installed in order to run MORB SLAM2.
-
 We have included only 2 datasets in our repository to keep the download small. The sequences are numbered 04 and 06, and they are a short straight track and a short elliptical track respectively. If you would like to download more sequences, please visit http://www.cvlibs.net/datasets/kitti/eval_odometry.php for the appropriate download link.
 
-If you would like to run MORB SLAM2 on the KITTI datasets, after building, run the following command:
+If you would like to run MORB SLAM2 on the KITTI datasets, after building (see the instructions in the ORB SLAM2 README below), run the following command:
 
     <PATH_TO_MORB_SLAM2>/Examples/Stereo/stereo_kitti <PATH_TO_MORB_SLAM2>/Vocabulary/ORBvoc.txt <PATH_TO_MORB_SLAM2>/Examples/Stereo/KITTI<SEQUENCE_##>.yaml <PATH_TO_MORB_SLAM2>/datasets/kitti-odom/sequences/<SEQUENCE_##>/
 
@@ -17,6 +15,8 @@ The script will also output a result file called "TestOursCameraTrajectory.txt",
     R11 R12 R13 T14 R21 R22 R23 T24 R31 R32 R33 T34
 
 where Rij is the rotation component at row i and column j, and Tij is the translation component at row i and column j. i and j correspond to the homogeneous matrix rows and columns.
+
+The following documentation on installation and setup is sampled from ORB SLAM2's README. Follow it for instructions on all the dependencies that must be installed in order to run MORB SLAM2.
 
 # ORB-SLAM2
 **Authors:** [Raul Mur-Artal](http://webdiis.unizar.es/~raulmur/), [Juan D. Tardos](http://webdiis.unizar.es/~jdtardos/), [J. M. M. Montiel](http://webdiis.unizar.es/~josemari/) and [Dorian Galvez-Lopez](http://doriangalvez.com/) ([DBoW2](https://github.com/dorian3d/DBoW2))
