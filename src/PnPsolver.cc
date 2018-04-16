@@ -173,13 +173,14 @@ cv::Mat PnPsolver::iterate(int nIterations, bool &bNoMore, vector<bool> &vbInlie
     if(N<mRansacMinInliers)
     {
         bNoMore = true;
+        cerr << "RETURN EMPTY NOT ENOUGH INLIERS\n";
         return cv::Mat();
     }
 
     vector<size_t> vAvailableIndices;
 
     int nCurrentIterations = 0;
-    while(mnIterations<mRansacMaxIts || nCurrentIterations<nIterations)
+    while(mnIterations < mRansacMaxIts || nCurrentIterations < nIterations)
     {
         nCurrentIterations++;
         mnIterations++;
@@ -232,6 +233,7 @@ cv::Mat PnPsolver::iterate(int nIterations, bool &bNoMore, vector<bool> &vbInlie
                     if(mvbRefinedInliers[i])
                         vbInliers[mvKeyPointIndices[i]] = true;
                 }
+                cerr << "RETURN REFINED\n";
                 return mRefinedTcw.clone();
             }
 
@@ -250,10 +252,12 @@ cv::Mat PnPsolver::iterate(int nIterations, bool &bNoMore, vector<bool> &vbInlie
                 if(mvbBestInliers[i])
                     vbInliers[mvKeyPointIndices[i]] = true;
             }
+            cerr << "RETURN BEST\n";
             return mBestTcw.clone();
         }
     }
 
+    cerr << "RETURN EMPTY DEFAULT\n";
     return cv::Mat();
 }
 

@@ -42,6 +42,25 @@ public:
  *		wp_{t}		Initial pose in world (EdgeStereoSE3ProjectXYZOnlyPose.Xw which is type Vector3d)
  *		dt			IMU sampling frequency
  */
+
+struct RTPose
+{
+	Eigen::Matrix3d R;
+	Eigen::Vector3d t;
+
+	RTPose() {}
+	RTPose(const Eigen::Matrix3d& Rin, const Eigen::Vector3d& tin)
+		: R(Rin), t(tin) {}
+
+	Eigen::Matrix4d toHMat() const
+	{
+		Eigen::Matrix4d H = Eigen::Matrix4d::Identity();
+		H.block<3, 3>(0, 0) = R;
+		H.block<3, 1>(0, 3) = t;
+		return H;
+	}
+};
+
 class KittiMotion : public MotionBase
 {
 public:
@@ -63,8 +82,8 @@ public:
 			 0,
 			 0;
 		g << 0,
-			 0,
-			 -9.8;
+			 9.8,
+			 0;
 		ba << 0,
 			  0,
 			  0;
@@ -79,7 +98,8 @@ public:
 				 0;
 	}
 	~KittiMotion() {}
-	Eigen::Matrix3d exp(const Eigen::Vector3d &omega) {
+	Eigen::Matrix3d exp(const Eigen::Vector3d &omega)
+	{
 		double theta = omega.norm();
 		Eigen::Matrix3d Omega = g2o::skew(omega);
 		Eigen::Matrix3d Omega2 = Omega * Omega;
@@ -92,7 +112,9 @@ public:
 			 + sin(theta) / theta * Omega + (1 - cos(theta)) / (theta * theta) * Omega2);
 		return R;
 	}
-	g2o::SE3Quat calc(const Eigen::Vector3d &p0, const Eigen::Matrix3d &R0, Eigen::Vector3d &v0, const Eigen::VectorXd &imu, const double &dt) {
+	//g2o::SE3Quat calc(const Eigen::Vector3d &p0, const Eigen::Matrix3d &R0, Eigen::Vector3d &v0, const Eigen::VectorXd &imu, const double &dt)
+	RTPose calc(const Eigen::Vector3d &p0, const Eigen::Matrix3d &R0, Eigen::Vector3d &v0, const Eigen::VectorXd &imu, const double &dt)
+	{
 		omega[0] = imu[3];
 		omega[1] = imu[4];
 		omega[2] = imu[5];
@@ -100,35 +122,35 @@ public:
 		a[1] = imu[1];
 		a[2] = imu[2];
 		// Update equations
-		v0  = Eigen::Vector3d(imu[6], imu[7], imu[8]);
+		// v0  = Eigen::Vector3d(imu[6], imu[7], imu[8]);
 		R   = R0 * exp((omega - bg - etagd) * dt);
-		p   = p0 + (R0 * v0 * dt) + (0.5 * g * (dt * dt)) + (0.5 * R0 * (a - ba - etaad) * (dt * dt));
-		// v0 += (g * dt) + (R0 * (a - ba - etaad) * dt);
-		g2o::SE3Quat result(R, p);
-		return result;
+		// p   = p0 + (R0 * v0 * dt) + (0.5 * g * (dt * dt)) + (0.5 * R0 * (a - ba - etaad) * (dt * dt));
+		p   = p0 + (v0 * dt) + (0.5 * g * (dt * dt)) + (0.5 * R0 * (a - ba - etaad) * (dt * dt));
+		v0 += (g * dt) + (R0 * (a - ba - etaad) * dt);
+		//g2o::SE3Quat result(R, p);
+		return RTPose(R, p);
 	}
-	g2o::SE3Quat calc(const Eigen::Vector3d &p0, const Eigen::Matrix3d &R0, Eigen::Vector3d &v0, const std::deque<std::pair<double, Eigen::VectorXd>> &imus)
+	//g2o::SE3Quat calc(const Eigen::Vector3d &p0, const Eigen::Matrix3d &R0, Eigen::Vector3d &v0, const std::deque<std::pair<double, Eigen::VectorXd>> &imus)
+	RTPose calc(const Eigen::Vector3d &p0, const Eigen::Matrix3d &R0, Eigen::Vector3d &v0, const std::deque<std::pair<double, Eigen::VectorXd>> &imus)
 	{
-		g2o::SE3Quat result;
+		RTPose result;
 		Eigen::Vector3d p_previous = p0;
 		Eigen::Matrix3d R_previous = R0;
 		for (size_t i = 0; i < (imus.size() - 1); ++i)
 		{
 			result = calc(p_previous, R_previous, v0, imus[i].second, imus[i + 1].first - imus[i].first);
-			p_previous = result.translation();
-			R_previous = result.rotation().toRotationMatrix();
+			p_previous = result.t; //result.translation();
+			R_previous = result.R; //result.rotation().toRotationMatrix();
 		}
 		return result;
 	}
-	void setInitialV(Eigen::Vector3d v_in) {
-		v = v_in;
-		return;
-	}
-	void setLinearBias(Eigen::Vector3d ba_in) {
+	void setLinearBias(Eigen::Vector3d ba_in)
+	{
 		ba = ba_in;
 		return;
 	}
-	void setAngularBias(Eigen::Vector3d bg_in) {
+	void setAngularBias(Eigen::Vector3d bg_in)
+	{
 		bg = bg_in;
 		return;
 	}

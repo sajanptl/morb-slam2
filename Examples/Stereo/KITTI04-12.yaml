@@ -18,8 +18,9 @@ Camera.p2: 0.0
 Camera.width: 1241
 Camera.height: 376
 
+# We changed from 10 to 5
 # Camera frames per second 
-Camera.fps: 10.0
+Camera.fps: 5.0
 
 # stereo baseline times fx
 Camera.bf: 379.8145

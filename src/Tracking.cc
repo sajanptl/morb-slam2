@@ -310,7 +310,6 @@ void Tracking::Track()
         {
             // Local Mapping is activated. This is the normal behaviour, unless
             // you explicitly activate the "only tracking" mode.
-
             if(mState==OK)
             {
                 // Local Mapping might have changed some MapPoints tracked in last frame
@@ -438,7 +437,58 @@ void Tracking::Track()
                 cv::Mat LastTwc = cv::Mat::eye(4,4,CV_32F);
                 mLastFrame.GetRotationInverse().copyTo(LastTwc.rowRange(0,3).colRange(0,3));
                 mLastFrame.GetCameraCenter().copyTo(LastTwc.rowRange(0,3).col(3));
-                mVelocity = mCurrentFrame.mTcw*LastTwc;
+                // START OUR CHANGES
+                // mVelocity = mCurrentFrame.mTcw*LastTwc;
+                cout << "OldMVe:\n" << mCurrentFrame.mTcw*LastTwc << "\n";
+                // Move the preint code here
+
+                // TODO: Add in IMU Preintegration here
+                cerr << "LastTS:\n" << mLastFrame.mTimeStamp << "\n";
+                cerr << "CurrTS:\n" << mCurrentFrame.mTimeStamp << "\n";
+                deque<pair<double, VectorXd>> uSeq = mImuSeq->get(mLastFrame.mTimeStamp, mCurrentFrame.mTimeStamp);
+                //deque<pair<double, VectorXd>> uSeq = mImuSeq->get(lastKFTime, mCurrentFrame.mTimeStamp);
+                
+                //Vector3d p0(lastFramePoseH.at<float>(0, 2),
+                //          lastFramePoseH.at<float>(1, 2),
+                //          lastFramePoseH.at<float>(2, 2));
+                Vector3d p0(mLastFrame.mTcw.at<float>(0, 2),
+                            mLastFrame.mTcw.at<float>(1, 2),
+                            mLastFrame.mTcw.at<float>(2, 2));
+                cv::Mat mVelTemp = mCurrentFrame.mTcw * LastTwc;
+
+                Vector3d v0(mVelTemp.at<float>(0, 2), mVelTemp.at<float>(1, 2), mVelTemp.at<float>(2, 2));
+                v0 /= (mCurrentFrame.mTimeStamp - mLastFrame.mTimeStamp);
+                // Vector3d v0(uSeq[0].second[6], uSeq[0].second[7], uSeq[0].second[8]);
+                Matrix3d R0;
+                for (size_t i = 0; i < 3; ++i)
+                {
+                    //for (size_t j = 0; j < 3; ++j) R0(i, j) = lastFramePoseH.at<float>(i, j);
+                    for (size_t j = 0; j < 3; ++j) R0(i, j) = mLastFrame.mTcw.at<float>(i, j);
+                }
+                // v0 = (R0.transpose() * v0);
+                //cerr << "v0\n" << v0 << "\n";
+
+                auto preIntSE3Quat = kittiMotion.calc(p0, R0, v0, uSeq);
+                //auto preIntH = preIntSE3Quat.to_homogeneous_matrix();
+                auto preIntH = preIntSE3Quat.toHMat();
+
+                cv::Mat preIntTcw = cv::Mat::eye(4, 4, CV_32F);
+                // for (size_t i = 2; i < 3; ++i)
+                //     for (size_t j = 3; j < 4; ++j) preIntTcw.at<float>(i, j) = preIntH(i, j);
+                // for (size_t i = 0; i < 3; ++i)
+                //     for (size_t j = 0; j < 3; ++j) preIntTcw.at<float>(i, j) = preIntH(i, j);
+                preIntTcw.at<float>(2, 3) = preIntH(2, 3);
+                preIntTcw.at<float>(1, 3) = preIntH(1, 3);
+                preIntTcw.at<float>(0, 3) = preIntH(0, 3);
+                
+                // mCurrentFrame.SetPose(preIntTcw * mLastFrame.mTcw);
+                // mCurrentFrame.SetPose(mVelocity * mLastFrame.mTcw);
+                mVelocity = preIntTcw;
+                // mVelocity = mCurrentFrame.mTcw * LastTwc;
+                // mVelocity  = 0.5 * (preIntTcw + mCurrentFrame.mTcw * LastTwc);
+                cerr << "preInt:\n" << preIntTcw << "\n";
+                //cerr << "preInt:\n" << preIntTcw * lastFramePoseH << "\n";
+                // END OUR CHANGES
             }
             else
                 mVelocity = cv::Mat();
@@ -887,39 +937,39 @@ bool Tracking::TrackWithMotionModel()
     // Create "visual odometry" points if in Localization Mode
     UpdateLastFrame();
 
-	// TODO: Add in IMU Preintegration here
-    deque<pair<double, VectorXd>> uSeq = mImuSeq->get(mLastFrame.mTimeStamp, mCurrentFrame.mTimeStamp);
-	//deque<pair<double, VectorXd>> uSeq = mImuSeq->get(lastKFTime, mCurrentFrame.mTimeStamp);
+	// // TODO: Add in IMU Preintegration here
+ //    deque<pair<double, VectorXd>> uSeq = mImuSeq->get(mLastFrame.mTimeStamp, mCurrentFrame.mTimeStamp);
+	// //deque<pair<double, VectorXd>> uSeq = mImuSeq->get(lastKFTime, mCurrentFrame.mTimeStamp);
 	
-	//Vector3d p0(lastFramePoseH.at<float>(0, 2),
-	//			lastFramePoseH.at<float>(1, 2),
-	//			lastFramePoseH.at<float>(2, 2));
-    Vector3d p0(mLastFrame.mTcw.at<float>(0, 2),
-                mLastFrame.mTcw.at<float>(1, 2),
-                mLastFrame.mTcw.at<float>(2, 2));
-    Vector3d v0(0, 0, 0);
-	// Vector3d v0(uSeq[0].second[6], uSeq[0].second[7], uSeq[0].second[8]);
-    Matrix3d R0;
-    for (size_t i = 0; i < 3; ++i)
-    {
-        //for (size_t j = 0; j < 3; ++j) R0(i, j) = lastFramePoseH.at<float>(i, j);
-        for (size_t j = 0; j < 3; ++j) R0(i, j) = mLastFrame.mTcw.at<float>(i, j);
-    }
-    // v0 = (R0.transpose() * v0);
-    //cout << "v0\n" << v0 << "\n";
+	// //Vector3d p0(lastFramePoseH.at<float>(0, 2),
+	// //			lastFramePoseH.at<float>(1, 2),
+	// //			lastFramePoseH.at<float>(2, 2));
+ //    Vector3d p0(mLastFrame.mTcw.at<float>(0, 2),
+ //                mLastFrame.mTcw.at<float>(1, 2),
+ //                mLastFrame.mTcw.at<float>(2, 2));
+ //    Vector3d v0(0, 0, 0);
+	// // Vector3d v0(uSeq[0].second[6], uSeq[0].second[7], uSeq[0].second[8]);
+ //    Matrix3d R0;
+ //    for (size_t i = 0; i < 3; ++i)
+ //    {
+ //        //for (size_t j = 0; j < 3; ++j) R0(i, j) = lastFramePoseH.at<float>(i, j);
+ //        for (size_t j = 0; j < 3; ++j) R0(i, j) = mLastFrame.mTcw.at<float>(i, j);
+ //    }
+ //    // v0 = (R0.transpose() * v0);
+ //    //cerr << "v0\n" << v0 << "\n";
 
-	auto preIntSE3Quat = kittiMotion.calc(p0, R0, v0, uSeq);
-	auto preIntH = preIntSE3Quat.to_homogeneous_matrix();
-    cv::Mat preIntTcw = cv::Mat::eye(4, 4, CV_32F);
-	for (size_t i = 0; i < 4; ++i)
-		for (size_t j = 0; j < 4; ++j) preIntTcw.at<float>(i, j) = preIntH(i, j);
+	// auto preIntSE3Quat = kittiMotion.calc(p0, R0, v0, uSeq);
+	// auto preIntH = preIntSE3Quat.to_homogeneous_matrix();
+ //    cv::Mat preIntTcw = cv::Mat::eye(4, 4, CV_32F);
+	// for (size_t i = 0; i < 4; ++i)
+	// 	for (size_t j = 0; j < 4; ++j) preIntTcw.at<float>(i, j) = preIntH(i, j);
 	
-	mCurrentFrame.SetPose(preIntTcw * mLastFrame.mTcw);
-    // mCurrentFrame.SetPose(mVelocity * mLastFrame.mTcw);
-    cout << "mVeloc:\n" << mVelocity << "\n";
-    cout << "preInt:\n" << preIntTcw * mLastFrame.mTcw << "\n";
-    //cout << "preInt:\n" << preIntTcw * lastFramePoseH << "\n";
-    cout << "mVoRel:\n" << mVelocity * mLastFrame.mTcw << "\n";
+	// mCurrentFrame.SetPose(preIntTcw * mLastFrame.mTcw);
+    mCurrentFrame.SetPose(mVelocity * mLastFrame.mTcw);
+ //    cerr << "mVeloc:\n" << mVelocity << "\n";
+ //    cerr << "preInt:\n" << preIntTcw * mLastFrame.mTcw << "\n";
+ //    //cerr << "preInt:\n" << preIntTcw * lastFramePoseH << "\n";
+    cerr << "mVoRel:\n" << mCurrentFrame.mTcw << "\n";
 
 
     fill(mCurrentFrame.mvpMapPoints.begin(),mCurrentFrame.mvpMapPoints.end(),static_cast<MapPoint*>(NULL));
@@ -931,7 +981,6 @@ bool Tracking::TrackWithMotionModel()
     else
         th=7;
     int nmatches = matcher.SearchByProjection(mCurrentFrame,mLastFrame,th,mSensor==System::MONOCULAR);
-
     // If few matches, uses a wider window search
     if(nmatches<20)
     {
@@ -939,10 +988,13 @@ bool Tracking::TrackWithMotionModel()
         nmatches = matcher.SearchByProjection(mCurrentFrame,mLastFrame,2*th,mSensor==System::MONOCULAR);
     }
 
-    if(nmatches<20)
+    if(nmatches<20) {
         return false;
+    }
 
     // Optimize frame pose with all matches
+    cerr << "LastTSInit:\n" << mLastFrame.mTimeStamp << "\n";
+    cerr << "CurrTSInit:\n" << mCurrentFrame.mTimeStamp << "\n";
     Optimizer::PoseOptimization(&mCurrentFrame);
 
     // Discard outliers
@@ -971,6 +1023,8 @@ bool Tracking::TrackWithMotionModel()
         mbVO = nmatchesMap<10;
         return nmatches>20;
     }
+
+    cerr << "CurTcw:\n" << mCurrentFrame.mTcw << "\n\n";
 
     return nmatchesMap>=10;
 }
@@ -1034,7 +1088,7 @@ bool Tracking::NeedNewKeyFrame()
     const int nKFs = mpMap->KeyFramesInMap();
 
     // Do not insert keyframes if not enough frames have passed from last relocalisation
-    if(mCurrentFrame.mnId<mnLastRelocFrameId+mMaxFrames && nKFs>mMaxFrames)
+    if(mCurrentFrame.mnId < mnLastRelocFrameId + mMaxFrames && nKFs > mMaxFrames)
         return false;
 
     // Tracked MapPoints in the reference keyframe
@@ -1525,7 +1579,6 @@ bool Tracking::Relocalization()
                         }
                     }
                 }
-
 
                 // If the pose is supported by enough inliers stop ransacs and continue
                 if(nGood>=50)
